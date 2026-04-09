@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: stakeholders-db
+    environment:
+      POSTGRES_USER: stakeholders_user
+      POSTGRES_PASSWORD: stakeholders_pass
+      POSTGRES_DB: stakeholders_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stakeholders_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  stakeholders-service:
+    build:
+      context: ./stakeholders-service
+      dockerfile: Dockerfile
+    container_name: stakeholders-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/stakeholders_db
+      SPRING_DATASOURCE_USERNAME: stakeholders_user
+      SPRING_DATASOURCE_PASSWORD: stakeholders_pass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.PostgreSQLDialect
+      SERVER_PORT: 8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - soa-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: soa-tourism-frontend
+    ports:
+      - "3001:3000"
+    depends_on:
+      - stakeholders-service
+    networks:
+      - soa-network
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:8081/api
+
+volumes:
+  postgres-data:
+
+networks:
+  soa-network:
+    driver: bridge
