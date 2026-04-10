@@ -66,6 +66,7 @@ services:
     container_name: blog-service
     environment:
       PORT: ${BLOG_SERVICE_PORT}
+      UPLOAD_DIR: /app/uploads
       DB_HOST: blog-postgres
       DB_PORT: 5432
       DB_NAME: ${BLOG_DB_NAME}
@@ -74,6 +75,9 @@ services:
       JWT_SECRET: ${JWT_SECRET}
     ports:
       - "${BLOG_SERVICE_PORT}:${BLOG_SERVICE_PORT}"
+    user: "0:0"
+    volumes:
+      - blog-uploads-data:/app/uploads
     depends_on:
       blog-postgres:
         condition: service_healthy
@@ -101,6 +105,7 @@ services:
 volumes:
   postgres-data:
   blog-postgres-data:
+  blog-uploads-data:
 
 networks:
   soa-network:

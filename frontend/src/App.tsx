@@ -1,11 +1,12 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Home from './pages/Home';
 import Register from './pages/Register';
 import Login from './pages/Login';
 import Profile from './pages/Profile';
-import './styles/index.css';
+import Blogs from './pages/Blogs';
+import CreateBlog from './pages/CreateBlog';
+import Navbar from './components/Navbar';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuth();
@@ -15,19 +16,33 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 function AppContent() {
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/login" element={<Login />} />
-        <Route 
-          path="/profile" 
-          element={
-            <PrivateRoute>
-              <Profile />
-            </PrivateRoute>
-          } 
-        />
-      </Routes>
+      <div className="min-h-screen">
+        <Navbar />
+        <main className="mx-auto w-full max-w-5xl px-4 py-6">
+          <Routes>
+            <Route path="/" element={<Navigate to="/blogs" replace />} />
+            <Route path="/blogs" element={<Blogs />} />
+            <Route
+              path="/blogs/new"
+              element={
+                <PrivateRoute>
+                  <CreateBlog />
+                </PrivateRoute>
+              }
+            />
+            <Route path="/register" element={<Register />} />
+            <Route path="/login" element={<Login />} />
+            <Route
+              path="/profile"
+              element={
+                <PrivateRoute>
+                  <Profile />
+                </PrivateRoute>
+              }
+            />
+          </Routes>
+        </main>
+      </div>
     </Router>
   );
 }

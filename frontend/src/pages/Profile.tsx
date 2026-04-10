@@ -1,7 +1,6 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/api';
-import '../styles/profile.css';
 
 interface ProfileData {
   firstName?: string;
@@ -83,114 +82,198 @@ const Profile: React.FC = () => {
   };
 
   if (!user) {
-    return <div className="profile-container"><p>Please log in to view your profile.</p></div>;
+    return (
+      <div className="rounded-xl border bg-surface p-6 text-sm text-text-secondary">
+        Please log in to view your profile.
+      </div>
+    );
   }
 
   return (
-    <div className="profile-container">
-      <div className="profile-card">
-        <div className="profile-header">
-          <h1>My Profile</h1>
-          <button className="btn-logout" onClick={logout}>Logout</button>
+    <div className="mx-auto max-w-3xl">
+      <div className="mb-6 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">My profile</h1>
+          <p className="mt-1 text-sm text-text-secondary">
+            Update your public details.
+          </p>
         </div>
+        <button
+          type="button"
+          onClick={logout}
+          className="rounded-lg border bg-surface px-4 py-2 text-sm font-medium text-error hover:bg-muted"
+        >
+          Logout
+        </button>
+      </div>
 
-        <div className="profile-info">
-          <div className="profile-picture">
-            {profileData.profilePicture ? (
-              <img src={profileData.profilePicture} alt="Profile" />
-            ) : (
-              <div className="profile-placeholder">No Image</div>
-            )}
-          </div>
-
-          <div className="profile-details">
-            <p><strong>Username:</strong> {user.username}</p>
-            <p><strong>Email:</strong> {user.email}</p>
-            <p><strong>Role:</strong> {user.role}</p>
-            {profileData.firstName && <p><strong>First Name:</strong> {profileData.firstName}</p>}
-            {profileData.lastName && <p><strong>Last Name:</strong> {profileData.lastName}</p>}
-            {profileData.biography && <p><strong>Biography:</strong> {profileData.biography}</p>}
-            {profileData.motto && <p><strong>Motto:</strong> {profileData.motto}</p>}
-          </div>
+      {message && (
+        <div
+          className={
+            message.toLowerCase().includes('success')
+              ? 'mb-4 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success'
+              : 'mb-4 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error'
+          }
+        >
+          {message}
         </div>
+      )}
 
-        {!isEditing && (
-          <button className="btn-edit" onClick={() => setIsEditing(true)}>
-            Edit Profile
-          </button>
-        )}
-
-        {isEditing && (
-          <form onSubmit={handleSubmit} className="profile-form">
-            <div className="form-group">
-              <label>First Name</label>
-              <input
-                type="text"
-                name="firstName"
-                value={profileData.firstName}
-                onChange={handleChange}
-                placeholder="Enter your first name"
-              />
+      <div className="rounded-xl border bg-surface p-6">
+        <div className="flex flex-col gap-6 sm:flex-row">
+          <div className="w-full sm:w-56">
+            <div className="aspect-square w-full overflow-hidden rounded-xl border bg-muted">
+              {profileData.profilePicture ? (
+                <img
+                  src={profileData.profilePicture}
+                  alt="Profile"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="grid h-full w-full place-items-center text-sm text-text-muted">
+                  No image
+                </div>
+              )}
             </div>
-
-            <div className="form-group">
-              <label>Last Name</label>
-              <input
-                type="text"
-                name="lastName"
-                value={profileData.lastName}
-                onChange={handleChange}
-                placeholder="Enter your last name"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Biography</label>
-              <textarea
-                name="biography"
-                value={profileData.biography}
-                onChange={handleChange}
-                placeholder="Tell us about yourself"
-                rows={4}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Motto / Citat</label>
-              <input
-                type="text"
-                name="motto"
-                value={profileData.motto}
-                onChange={handleChange}
-                placeholder="Your favorite quote or motto"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Profile Picture</label>
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-text-secondary">
+                Profile picture
+              </label>
               <input
                 type="file"
                 accept="image/*"
                 onChange={handleImageUpload}
+                className="mt-1 block w-full text-sm text-text-secondary file:mr-3 file:rounded-lg file:border file:bg-surface file:px-3 file:py-2 file:text-sm file:font-medium hover:file:bg-muted"
               />
             </div>
+          </div>
 
-            <div className="form-actions">
-              <button type="submit" disabled={loading} className="btn-save">
-                {loading ? 'Saving...' : 'Save Changes'}
-              </button>
-              <button 
-                type="button" 
-                onClick={() => setIsEditing(false)}
-                className="btn-cancel"
-              >
-                Cancel
-              </button>
+          <div className="flex-1">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border bg-muted px-3 py-2">
+                <div className="text-xs text-text-muted">Username</div>
+                <div className="text-sm font-medium">{user.username}</div>
+              </div>
+              <div className="rounded-lg border bg-muted px-3 py-2">
+                <div className="text-xs text-text-muted">Email</div>
+                <div className="text-sm font-medium">{user.email}</div>
+              </div>
+              <div className="rounded-lg border bg-muted px-3 py-2">
+                <div className="text-xs text-text-muted">Role</div>
+                <div className="text-sm font-medium">{user.role}</div>
+              </div>
             </div>
-          </form>
-        )}
 
-        {message && <div className="message">{message}</div>}
+            {!isEditing ? (
+              <div className="mt-6">
+                <div className="space-y-2 text-sm text-text-secondary">
+                  {profileData.firstName && (
+                    <div>
+                      <span className="text-text-muted">First name:</span> {profileData.firstName}
+                    </div>
+                  )}
+                  {profileData.lastName && (
+                    <div>
+                      <span className="text-text-muted">Last name:</span> {profileData.lastName}
+                    </div>
+                  )}
+                  {profileData.motto && (
+                    <div>
+                      <span className="text-text-muted">Motto:</span> {profileData.motto}
+                    </div>
+                  )}
+                  {profileData.biography && (
+                    <div className="whitespace-pre-wrap">
+                      <span className="text-text-muted">Bio:</span> {profileData.biography}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
+                >
+                  Edit profile
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary">
+                      First name
+                    </label>
+                    <input
+                      type="text"
+                      name="firstName"
+                      value={profileData.firstName}
+                      onChange={handleChange}
+                      className="mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-text-secondary">
+                      Last name
+                    </label>
+                    <input
+                      type="text"
+                      name="lastName"
+                      value={profileData.lastName}
+                      onChange={handleChange}
+                      className="mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary">
+                    Motto
+                  </label>
+                  <input
+                    type="text"
+                    name="motto"
+                    value={profileData.motto}
+                    onChange={handleChange}
+                    className="mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary">
+                    Biography
+                  </label>
+                  <textarea
+                    name="biography"
+                    value={profileData.biography}
+                    onChange={handleChange}
+                    rows={5}
+                    className="mt-1 w-full resize-y rounded-lg border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(false)}
+                    className="rounded-lg border bg-surface px-4 py-2 text-sm font-medium hover:bg-muted"
+                    disabled={loading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary-hover disabled:opacity-60"
+                  >
+                    {loading ? 'Saving…' : 'Save changes'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

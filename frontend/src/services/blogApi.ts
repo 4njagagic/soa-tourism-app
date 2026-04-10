@@ -1,6 +1,15 @@
 import axios from 'axios';
 
-const BLOG_API_URL = import.meta.env.VITE_BLOG_API_URL || '/blog-api/api';
+export const BLOG_API_URL = import.meta.env.VITE_BLOG_API_URL || '/blog-api/api';
+export const BLOG_PUBLIC_BASE = BLOG_API_URL.replace(/\/api\/?$/, '');
+
+export const resolveBlogAssetUrl = (url: string) => {
+  if (!url) return url;
+  if (/^https?:\/\//i.test(url)) return url;
+
+  if (url.startsWith('/')) return `${BLOG_PUBLIC_BASE}${url}`;
+  return `${BLOG_PUBLIC_BASE}/${url}`;
+};
 
 export interface Blog {
   id: string;
@@ -51,6 +60,18 @@ export const blogService = {
 
   createBlog: async (data: CreateBlogRequest): Promise<Blog> => {
     const res = await blogClient.post('/blogs', data);
+    return res.data;
+  },
+
+  createBlogWithFiles: async (data: { title: string; description: string; images?: File[] }): Promise<Blog> => {
+    const form = new FormData();
+    form.append('title', data.title);
+    form.append('description', data.description);
+    (data.images || []).forEach((f) => form.append('images', f));
+
+    const res = await blogClient.post('/blogs', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return res.data;
   },
 
