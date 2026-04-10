@@ -1,6 +1,6 @@
-import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { userService } from '../services/api';
+import React, { useState, useEffect, ChangeEvent, FormEvent } from "react";
+import { useAuth } from "../context/AuthContext";
+import { userService } from "../services/api";
 
 interface ProfileData {
   firstName?: string;
@@ -13,15 +13,15 @@ interface ProfileData {
 const Profile: React.FC = () => {
   const { user, logout } = useAuth();
   const [profileData, setProfileData] = useState<ProfileData>({
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
-    biography: user?.biography || '',
-    profilePicture: user?.profilePicture || '',
-    motto: user?.motto || '',
+    firstName: user?.firstName || "",
+    lastName: user?.lastName || "",
+    biography: user?.biography || "",
+    profilePicture: user?.profilePicture || "",
+    motto: user?.motto || "",
   });
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     if (user?.id) {
@@ -34,18 +34,20 @@ const Profile: React.FC = () => {
     try {
       const profile = await userService.getProfile(user.id);
       setProfileData({
-        firstName: profile.firstName || '',
-        lastName: profile.lastName || '',
-        biography: profile.biography || '',
-        profilePicture: profile.profilePicture || '',
-        motto: profile.motto || '',
+        firstName: profile.firstName || "",
+        lastName: profile.lastName || "",
+        biography: profile.biography || "",
+        profilePicture: profile.profilePicture || "",
+        motto: profile.motto || "",
       });
     } catch (error) {
-      console.error('Failed to fetch profile:', error);
+      console.error("Failed to fetch profile:", error);
     }
   };
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
     const { name, value } = e.target;
     setProfileData((prev) => ({ ...prev, [name]: value }));
   };
@@ -71,11 +73,11 @@ const Profile: React.FC = () => {
     setLoading(true);
     try {
       await userService.updateProfile(user.id, profileData);
-      setMessage('Profile updated successfully!');
+      setMessage("Profile updated successfully!");
       setIsEditing(false);
-      setTimeout(() => setMessage(''), 3000);
+      setTimeout(() => setMessage(""), 3000);
     } catch (error: any) {
-      setMessage(error.response?.data?.message || 'Failed to update profile');
+      setMessage(error.response?.data?.message || "Failed to update profile");
     } finally {
       setLoading(false);
     }
@@ -110,9 +112,9 @@ const Profile: React.FC = () => {
       {message && (
         <div
           className={
-            message.toLowerCase().includes('success')
-              ? 'mb-4 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success'
-              : 'mb-4 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error'
+            message.toLowerCase().includes("success")
+              ? "mb-4 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success"
+              : "mb-4 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error"
           }
         >
           {message}
@@ -169,22 +171,26 @@ const Profile: React.FC = () => {
                 <div className="space-y-2 text-sm text-text-secondary">
                   {profileData.firstName && (
                     <div>
-                      <span className="text-text-muted">First name:</span> {profileData.firstName}
+                      <span className="text-text-muted">First name:</span>{" "}
+                      {profileData.firstName}
                     </div>
                   )}
                   {profileData.lastName && (
                     <div>
-                      <span className="text-text-muted">Last name:</span> {profileData.lastName}
+                      <span className="text-text-muted">Last name:</span>{" "}
+                      {profileData.lastName}
                     </div>
                   )}
                   {profileData.motto && (
                     <div>
-                      <span className="text-text-muted">Motto:</span> {profileData.motto}
+                      <span className="text-text-muted">Motto:</span>{" "}
+                      {profileData.motto}
                     </div>
                   )}
                   {profileData.biography && (
                     <div className="whitespace-pre-wrap">
-                      <span className="text-text-muted">Bio:</span> {profileData.biography}
+                      <span className="text-text-muted">Bio:</span>{" "}
+                      {profileData.biography}
                     </div>
                   )}
                 </div>
@@ -267,7 +273,7 @@ const Profile: React.FC = () => {
                     disabled={loading}
                     className="rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary-hover disabled:opacity-60"
                   >
-                    {loading ? 'Saving…' : 'Save changes'}
+                    {loading ? "Saving…" : "Save changes"}
                   </button>
                 </div>
               </form>

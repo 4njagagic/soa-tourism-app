@@ -1,33 +1,35 @@
-import React, { useState, ChangeEvent, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { authService } from '../services/api';
+import React, { useState, ChangeEvent, FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { authService } from "../services/api";
 
 const Register: React.FC = () => {
   const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    role: 'TOURIST' as const,
+    username: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    role: "TOURIST" as const,
   });
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       setLoading(false);
       return;
     }
@@ -41,9 +43,9 @@ const Register: React.FC = () => {
       });
 
       login(response.user, response.token);
-      navigate('/blogs');
+      navigate("/blogs");
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed');
+      setError(err.response?.data?.message || "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -144,12 +146,12 @@ const Register: React.FC = () => {
             disabled={loading}
             className="w-full rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary-hover disabled:opacity-60"
           >
-            {loading ? 'Registering…' : 'Register'}
+            {loading ? "Registering…" : "Register"}
           </button>
         </form>
 
         <p className="mt-4 text-sm text-text-secondary">
-          Already have an account?{' '}
+          Already have an account?{" "}
           <a className="text-primary hover:text-primary-hover" href="/login">
             Login here
           </a>

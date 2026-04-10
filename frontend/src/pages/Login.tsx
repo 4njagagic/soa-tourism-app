@@ -1,14 +1,14 @@
-import React, { useState, ChangeEvent, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { authService } from '../services/api';
+import React, { useState, ChangeEvent, FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { authService } from "../services/api";
 
 const Login: React.FC = () => {
   const [formData, setFormData] = useState({
-    username: '',
-    password: '',
+    username: "",
+    password: "",
   });
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -20,7 +20,7 @@ const Login: React.FC = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
@@ -30,9 +30,9 @@ const Login: React.FC = () => {
       });
 
       login(response.user, response.token);
-      navigate('/blogs');
+      navigate("/blogs");
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed');
+      setError(err.response?.data?.message || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -88,12 +88,12 @@ const Login: React.FC = () => {
             disabled={loading}
             className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-60"
           >
-            {loading ? 'Logging in…' : 'Login'}
+            {loading ? "Logging in…" : "Login"}
           </button>
         </form>
 
         <p className="mt-4 text-sm text-text-secondary">
-          Don&apos;t have an account?{' '}
+          Don&apos;t have an account?{" "}
           <a className="text-primary hover:text-primary-hover" href="/register">
             Register here
           </a>

@@ -1,7 +1,7 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
-import { blogService } from '../services/blogApi';
+import React, { useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import { blogService } from "../services/blogApi";
 
 const MarkdownPreview: React.FC<{ value: string }> = ({ value }) => {
   return (
@@ -9,7 +9,9 @@ const MarkdownPreview: React.FC<{ value: string }> = ({ value }) => {
       components={{
         h1: (props) => <h1 className="mb-2 text-xl font-semibold" {...props} />,
         h2: (props) => <h2 className="mb-2 text-lg font-semibold" {...props} />,
-        h3: (props) => <h3 className="mb-2 text-base font-semibold" {...props} />,
+        h3: (props) => (
+          <h3 className="mb-2 text-base font-semibold" {...props} />
+        ),
         p: (props) => (
           <p
             className="mb-2 whitespace-pre-wrap text-sm text-text-secondary"
@@ -17,7 +19,10 @@ const MarkdownPreview: React.FC<{ value: string }> = ({ value }) => {
           />
         ),
         li: (props) => (
-          <li className="ml-5 list-disc text-sm text-text-secondary" {...props} />
+          <li
+            className="ml-5 list-disc text-sm text-text-secondary"
+            {...props}
+          />
         ),
         a: (props) => (
           <a
@@ -38,7 +43,7 @@ const MarkdownPreview: React.FC<{ value: string }> = ({ value }) => {
         ),
       }}
     >
-      {value || ''}
+      {value || ""}
     </ReactMarkdown>
   );
 };
@@ -48,26 +53,30 @@ const CreateBlog: React.FC = () => {
 
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [images, setImages] = useState<File[]>([]);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const canPublish = title.trim() && description.trim();
 
   const imageLabel = useMemo(() => {
-    if (!images || images.length === 0) return 'No images selected';
+    if (!images || images.length === 0) return "No images selected";
     if (images.length === 1) return images[0].name;
     return `${images.length} images selected`;
   }, [images]);
 
   const withTextareaSelection = (
-    apply: (value: string, start: number, end: number) => {
+    apply: (
+      value: string,
+      start: number,
+      end: number,
+    ) => {
       nextValue: string;
       nextSelectionStart: number;
       nextSelectionEnd: number;
-    }
+    },
   ) => {
     const el = descriptionRef.current;
     const start = el?.selectionStart ?? description.length;
@@ -75,7 +84,7 @@ const CreateBlog: React.FC = () => {
     const { nextValue, nextSelectionStart, nextSelectionEnd } = apply(
       description,
       start,
-      end
+      end,
     );
     setDescription(nextValue);
 
@@ -104,7 +113,7 @@ const CreateBlog: React.FC = () => {
 
   const prefixLine = (prefix: string) => {
     withTextareaSelection((value, start, end) => {
-      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+      const lineStart = value.lastIndexOf("\n", start - 1) + 1;
       const nextValue =
         value.slice(0, lineStart) + prefix + value.slice(lineStart);
       const delta = prefix.length;
@@ -118,7 +127,7 @@ const CreateBlog: React.FC = () => {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setSubmitting(true);
 
     try {
@@ -128,9 +137,9 @@ const CreateBlog: React.FC = () => {
         images,
       });
 
-      navigate('/blogs', { state: { openBlogId: created.id } });
+      navigate("/blogs", { state: { openBlogId: created.id } });
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Failed to create blog');
+      setError(err?.response?.data?.error || "Failed to create blog");
     } finally {
       setSubmitting(false);
     }
@@ -175,28 +184,28 @@ const CreateBlog: React.FC = () => {
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => prefixLine('# ')}
+                  onClick={() => prefixLine("# ")}
                   className="rounded-md border bg-secondary-soft px-2 py-1 text-xs font-medium text-text-primary hover:bg-muted"
                 >
                   H1
                 </button>
                 <button
                   type="button"
-                  onClick={() => prefixLine('## ')}
+                  onClick={() => prefixLine("## ")}
                   className="rounded-md border bg-secondary-soft px-2 py-1 text-xs font-medium text-text-primary hover:bg-muted"
                 >
                   H2
                 </button>
                 <button
                   type="button"
-                  onClick={() => wrapSelection('**', '**', 'bold text')}
+                  onClick={() => wrapSelection("**", "**", "bold text")}
                   className="rounded-md border bg-secondary-soft px-2 py-1 text-xs font-medium text-text-primary hover:bg-muted"
                 >
                   Bold
                 </button>
                 <button
                   type="button"
-                  onClick={() => wrapSelection('_', '_', 'italic text')}
+                  onClick={() => wrapSelection("_", "_", "italic text")}
                   className="rounded-md border bg-secondary-soft px-2 py-1 text-xs font-medium text-text-primary hover:bg-muted"
                 >
                   Italic
@@ -204,7 +213,7 @@ const CreateBlog: React.FC = () => {
                 <button
                   type="button"
                   onClick={() =>
-                    wrapSelection('[', '](https://example.com)', 'link text')
+                    wrapSelection("[", "](https://example.com)", "link text")
                   }
                   className="rounded-md border bg-secondary-soft px-2 py-1 text-xs font-medium text-text-primary hover:bg-muted"
                 >
@@ -212,21 +221,21 @@ const CreateBlog: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => prefixLine('- ')}
+                  onClick={() => prefixLine("- ")}
                   className="rounded-md border bg-secondary-soft px-2 py-1 text-xs font-medium text-text-primary hover:bg-muted"
                 >
                   List
                 </button>
                 <button
                   type="button"
-                  onClick={() => prefixLine('> ')}
+                  onClick={() => prefixLine("> ")}
                   className="rounded-md border bg-secondary-soft px-2 py-1 text-xs font-medium text-text-primary hover:bg-muted"
                 >
                   Quote
                 </button>
                 <button
                   type="button"
-                  onClick={() => wrapSelection('`', '`', 'code')}
+                  onClick={() => wrapSelection("`", "`", "code")}
                   className="rounded-md border bg-secondary-soft px-2 py-1 text-xs font-medium text-text-primary hover:bg-muted"
                 >
                   Code
@@ -236,13 +245,14 @@ const CreateBlog: React.FC = () => {
                   onClick={() =>
                     withTextareaSelection((value, start, end) => {
                       const selected = value.slice(start, end);
-                      const block = `\n\n\`\`\`\n${selected || ''}\n\`\`\`\n`;
-                      const nextValue = value.slice(0, start) + block + value.slice(end);
+                      const block = `\n\n\`\`\`\n${selected || ""}\n\`\`\`\n`;
+                      const nextValue =
+                        value.slice(0, start) + block + value.slice(end);
                       const cursor = start + 3;
                       return {
                         nextValue,
                         nextSelectionStart: cursor,
-                        nextSelectionEnd: cursor + (selected || '').length,
+                        nextSelectionEnd: cursor + (selected || "").length,
                       };
                     })
                   }
@@ -263,7 +273,9 @@ const CreateBlog: React.FC = () => {
             />
 
             <div className="mt-3 rounded-lg border bg-secondary-soft p-4">
-              <div className="text-xs font-medium text-text-secondary">Preview</div>
+              <div className="text-xs font-medium text-text-secondary">
+                Preview
+              </div>
               <div className="mt-2">
                 <MarkdownPreview value={description} />
               </div>
@@ -289,7 +301,7 @@ const CreateBlog: React.FC = () => {
           <div className="flex items-center justify-end gap-2">
             <button
               type="button"
-              onClick={() => navigate('/blogs')}
+              onClick={() => navigate("/blogs")}
               className="rounded-lg border bg-surface px-4 py-2 text-sm font-medium text-text-primary hover:bg-muted"
               disabled={submitting}
             >
@@ -300,7 +312,7 @@ const CreateBlog: React.FC = () => {
               disabled={submitting || !canPublish}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-60"
             >
-              {submitting ? 'Publishing...' : 'Publish'}
+              {submitting ? "Publishing..." : "Publish"}
             </button>
           </div>
         </div>

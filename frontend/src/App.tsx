@@ -1,14 +1,21 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import Register from './pages/Register';
-import Login from './pages/Login';
-import Profile from './pages/Profile';
-import Blogs from './pages/Blogs';
-import CreateBlog from './pages/CreateBlog';
-import Navbar from './components/Navbar';
+import React from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import Register from "./pages/Register";
+import Login from "./pages/Login";
+import Profile from "./pages/Profile";
+import Blogs from "./pages/Blogs";
+import CreateBlog from "./pages/CreateBlog";
+import Navbar from "./components/Navbar";
 
-const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const { isAuthenticated } = useAuth();
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
 };

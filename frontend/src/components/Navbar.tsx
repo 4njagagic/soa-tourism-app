@@ -1,14 +1,14 @@
-import React, { useMemo, useState } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import React, { useMemo, useState } from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   [
-    'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+    "rounded-md px-3 py-2 text-sm font-medium transition-colors",
     isActive
-      ? 'bg-primary-soft text-primary'
-      : 'text-text-secondary hover:bg-muted hover:text-text-primary',
-  ].join(' ');
+      ? "bg-primary-soft text-primary"
+      : "text-text-secondary hover:bg-muted hover:text-text-primary",
+  ].join(" ");
 
 const Navbar: React.FC = () => {
   const { isAuthenticated, user, logout } = useAuth();
@@ -16,19 +16,19 @@ const Navbar: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const displayName = useMemo(() => {
-    const full = `${user?.firstName || ''} ${user?.lastName || ''}`.trim();
-    return full || user?.username || '';
+    const full = `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
+    return full || user?.username || "";
   }, [user?.firstName, user?.lastName, user?.username]);
 
   const avatarText = useMemo(() => {
-    const base = (user?.username || displayName || 'U').trim();
-    return base ? base[0].toUpperCase() : 'U';
+    const base = (user?.username || displayName || "U").trim();
+    return base ? base[0].toUpperCase() : "U";
   }, [displayName, user?.username]);
 
   const onLogout = () => {
     setMenuOpen(false);
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   return (
@@ -44,7 +44,7 @@ const Navbar: React.FC = () => {
               Blogs
             </NavLink>
             <NavLink
-              to={isAuthenticated ? '/blogs/new' : '/login'}
+              to={isAuthenticated ? "/blogs/new" : "/login"}
               className={navLinkClass}
             >
               Create
@@ -111,7 +111,10 @@ const Navbar: React.FC = () => {
           <NavLink to="/blogs" className={navLinkClass}>
             Blogs
           </NavLink>
-          <NavLink to={isAuthenticated ? '/blogs/new' : '/login'} className={navLinkClass}>
+          <NavLink
+            to={isAuthenticated ? "/blogs/new" : "/login"}
+            className={navLinkClass}
+          >
             Create
           </NavLink>
         </div>

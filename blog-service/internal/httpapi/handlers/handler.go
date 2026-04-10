@@ -22,8 +22,8 @@ import (
 )
 
 type Handler struct {
-	Blogs    *service.BlogService
-	Comments *service.CommentService
+	Blogs     *service.BlogService
+	Comments  *service.CommentService
 	UploadDir string
 }
 
