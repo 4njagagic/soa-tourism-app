@@ -7,7 +7,12 @@
 
 ## Pokretanje
 
+### Konfiguracija
+
+Podešavanja za portove, kredencijale baza i API URL-ove su u root fajlu `.env` (u istom folderu gde je `docker-compose.yml`).
+
 ### Windows
+
 ```bash
 # Otvori PowerShell ili CMD u direktorijumu soa-tourism-app
 cd soa-tourism-app
@@ -17,6 +22,7 @@ docker-compose up --build
 ```
 
 ### Linux / Mac
+
 ```bash
 cd soa-tourism-app
 docker-compose up --build
@@ -24,17 +30,21 @@ docker-compose up --build
 
 ## Šta se dešava
 
-1. **PostgreSQL baza** - Startuje na `localhost:5432`
-2. **Backend** - Java Spring Boot na `http://localhost:8081/api`
-3. **Frontend** - React aplikacija na `http://localhost:3001`
+1. **PostgreSQL baza (stakeholders)** - Startuje na `localhost:5432`
+2. **PostgreSQL baza (blog)** - Startuje na `localhost:5433`
+3. **Stakeholders backend** - Java Spring Boot na `http://localhost:8081/api`
+4. **Blog backend** - Go REST servis na `http://localhost:8082/api`
+5. **Frontend** - React aplikacija na `http://localhost:3001`
 
 Čekaj 1-2 minuta da se sve pokrene.
 
 ## Pristup Aplikaciji
 
 Kada vidišu:
+
 ```
 stakeholders-service | ... Tomcat started on port(s): 8081
+blog-service | blog-service listening on :8082
 frontend | ... Listening on ...
 ```
 

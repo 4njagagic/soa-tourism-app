@@ -14,7 +14,7 @@ func GetConfig() Config {
 	}
 
 	return Config{
-		SomeAddress: os.Getenv("blablabla"),
+		SomeAddress: os.Getenv("SomeAddress"),
 		Address:     address,
 	}
 }

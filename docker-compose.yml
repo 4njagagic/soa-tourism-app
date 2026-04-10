@@ -3,17 +3,36 @@ services:
     image: postgres:15-alpine
     container_name: stakeholders-db
     environment:
-      POSTGRES_USER: stakeholders_user
-      POSTGRES_PASSWORD: stakeholders_pass
-      POSTGRES_DB: stakeholders_db
+      POSTGRES_USER: ${STAKEHOLDERS_DB_USER}
+      POSTGRES_PASSWORD: ${STAKEHOLDERS_DB_PASSWORD}
+      POSTGRES_DB: ${STAKEHOLDERS_DB_NAME}
     ports:
-      - "5432:5432"
+      - "${STAKEHOLDERS_DB_HOST_PORT}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
       - soa-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U stakeholders_user"]
+      test: ["CMD-SHELL", "pg_isready -U ${STAKEHOLDERS_DB_USER} -d ${STAKEHOLDERS_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  blog-postgres:
+    image: postgres:15-alpine
+    container_name: blog-db
+    environment:
+      POSTGRES_USER: ${BLOG_DB_USER}
+      POSTGRES_PASSWORD: ${BLOG_DB_PASSWORD}
+      POSTGRES_DB: ${BLOG_DB_NAME}
+    ports:
+      - "${BLOG_DB_HOST_PORT}:5432"
+    volumes:
+      - blog-postgres-data:/var/lib/postgresql/data
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${BLOG_DB_USER} -d ${BLOG_DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,16 +43,39 @@ services:
       dockerfile: Dockerfile
     container_name: stakeholders-service
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/stakeholders_db
-      SPRING_DATASOURCE_USERNAME: stakeholders_user
-      SPRING_DATASOURCE_PASSWORD: stakeholders_pass
+      JWT_SECRET: ${JWT_SECRET}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${STAKEHOLDERS_DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${STAKEHOLDERS_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${STAKEHOLDERS_DB_PASSWORD}
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.PostgreSQLDialect
-      SERVER_PORT: 8081
+      SERVER_PORT: ${STAKEHOLDERS_SERVICE_PORT}
     ports:
-      - "8081:8081"
+      - "${STAKEHOLDERS_SERVICE_PORT}:${STAKEHOLDERS_SERVICE_PORT}"
     depends_on:
       postgres:
+        condition: service_healthy
+    networks:
+      - soa-network
+    restart: unless-stopped
+
+  blog-service:
+    build:
+      context: ./blog-service
+      dockerfile: Dockerfile
+    container_name: blog-service
+    environment:
+      PORT: ${BLOG_SERVICE_PORT}
+      DB_HOST: blog-postgres
+      DB_PORT: 5432
+      DB_NAME: ${BLOG_DB_NAME}
+      DB_USER: ${BLOG_DB_USER}
+      DB_PASSWORD: ${BLOG_DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "${BLOG_SERVICE_PORT}:${BLOG_SERVICE_PORT}"
+    depends_on:
+      blog-postgres:
         condition: service_healthy
     networks:
       - soa-network
@@ -43,19 +85,22 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_BLOG_API_URL: ${VITE_BLOG_API_URL}
     container_name: soa-tourism-frontend
     ports:
-      - "3001:3000"
+      - "${FRONTEND_HOST_PORT}:${FRONTEND_CONTAINER_PORT}"
     depends_on:
       - stakeholders-service
+      - blog-service
     networks:
       - soa-network
     restart: unless-stopped
-    environment:
-      VITE_API_URL: http://localhost:8081/api
 
 volumes:
   postgres-data:
+  blog-postgres-data:
 
 networks:
   soa-network:
