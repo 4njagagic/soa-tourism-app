@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -38,7 +39,11 @@ func main() {
 	blogSvc := service.NewBlogService(blogRepo)
 	commentSvc := service.NewCommentService(commentRepo)
 
-	handler := handlers.New(blogSvc, commentSvc)
+	if err := os.MkdirAll(cfg.UploadDir, 0o755); err != nil {
+		log.Fatalf("upload dir init error (%s): %v", filepath.Clean(cfg.UploadDir), err)
+	}
+
+	handler := handlers.New(blogSvc, commentSvc, cfg.UploadDir)
 
 	h := httpapi.NewRouter(cfg, handler)
 	srv := &http.Server{

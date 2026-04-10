@@ -1,25 +1,34 @@
 package handlers
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"blog-service/internal/domain"
 	"blog-service/internal/httpapi/dto"
 	"blog-service/internal/httpapi/middleware"
 	"blog-service/internal/service"
+
+	"github.com/google/uuid"
 )
 
 type Handler struct {
 	Blogs    *service.BlogService
 	Comments *service.CommentService
+	UploadDir string
 }
 
-func New(blogs *service.BlogService, comments *service.CommentService) *Handler {
-	return &Handler{Blogs: blogs, Comments: comments}
+func New(blogs *service.BlogService, comments *service.CommentService, uploadDir string) *Handler {
+	return &Handler{Blogs: blogs, Comments: comments, UploadDir: uploadDir}
 }
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
@@ -31,6 +40,37 @@ func (h *Handler) CreateBlog(w http.ResponseWriter, r *http.Request) {
 	username, ok := middleware.UsernameFromContext(r.Context())
 	if !ok {
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		return
+	}
+
+	contentType := r.Header.Get("Content-Type")
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		// Safety limit for uploads.
+		r.Body = http.MaxBytesReader(w, r.Body, 25<<20) // 25MB
+		if err := r.ParseMultipartForm(25 << 20); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid multipart form"})
+			return
+		}
+
+		title := strings.TrimSpace(r.FormValue("title"))
+		description := strings.TrimSpace(r.FormValue("description"))
+		imageURLs, err := h.saveUploadedImages(r.MultipartForm)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+
+		created, err := h.Blogs.CreateBlog(r.Context(), domain.Blog{
+			Title:          title,
+			DescriptionMD:  description,
+			ImageURLs:      imageURLs,
+			AuthorUsername: username,
+		})
+		if err != nil {
+			writeServiceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, toBlogResponse(created))
 		return
 	}
 
@@ -52,6 +92,84 @@ func (h *Handler) CreateBlog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, toBlogResponse(created))
+}
+
+func (h *Handler) saveUploadedImages(form *multipart.Form) ([]string, error) {
+	if form == nil {
+		return []string{}, nil
+	}
+	files := form.File["images"]
+	if len(files) == 0 {
+		return []string{}, nil
+	}
+
+	targetDir := filepath.Join(h.UploadDir, "blogs")
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		return nil, errors.New("failed to prepare upload directory")
+	}
+
+	urls := make([]string, 0, len(files))
+	for _, fh := range files {
+		if fh == nil {
+			continue
+		}
+
+		src, err := fh.Open()
+		if err != nil {
+			return nil, errors.New("failed to read uploaded file")
+		}
+
+		buf := make([]byte, 512)
+		n, _ := io.ReadFull(src, buf)
+		detected := http.DetectContentType(buf[:n])
+		if !strings.HasPrefix(detected, "image/") {
+			_ = src.Close()
+			return nil, errors.New("only image uploads are supported")
+		}
+
+		ext := strings.ToLower(filepath.Ext(fh.Filename))
+		if ext == "" {
+			ext = extFromContentType(detected)
+		}
+		if ext == "" {
+			ext = ".img"
+		}
+
+		name := uuid.NewString() + ext
+		dstPath := filepath.Join(targetDir, name)
+		dst, err := os.OpenFile(dstPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+		if err != nil {
+			_ = src.Close()
+			return nil, errors.New("failed to save uploaded file")
+		}
+
+		_, copyErr := io.Copy(dst, io.MultiReader(bytes.NewReader(buf[:n]), src))
+		_ = dst.Close()
+		_ = src.Close()
+		if copyErr != nil {
+			_ = os.Remove(dstPath)
+			return nil, errors.New("failed to save uploaded file")
+		}
+
+		urls = append(urls, "/uploads/blogs/"+name)
+	}
+
+	return urls, nil
+}
+
+func extFromContentType(ct string) string {
+	switch ct {
+	case "image/jpeg":
+		return ".jpg"
+	case "image/png":
+		return ".png"
+	case "image/gif":
+		return ".gif"
+	case "image/webp":
+		return ".webp"
+	default:
+		return ""
+	}
 }
 
 func (h *Handler) ListBlogs(w http.ResponseWriter, r *http.Request) {

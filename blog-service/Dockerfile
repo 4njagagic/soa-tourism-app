@@ -17,6 +17,9 @@ RUN adduser -D -H -s /sbin/nologin appuser \
 
 WORKDIR /app
 
+RUN mkdir -p /app/uploads \
+  && chown -R appuser:appuser /app
+
 COPY --from=builder /out/blog-service ./blog-service
 
 USER appuser

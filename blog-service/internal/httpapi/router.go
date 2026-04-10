@@ -12,6 +12,11 @@ func NewRouter(cfg config.Config, h *handlers.Handler) http.Handler {
 
 	mux := http.NewServeMux()
 
+	// Public uploads (images, etc.)
+	// NOTE: This is served as-is from UploadDir. Keep it public for simple image embeds.
+	fileServer := http.FileServer(http.Dir(cfg.UploadDir))
+	mux.Handle("/uploads/", http.StripPrefix("/uploads/", fileServer))
+
 	mux.HandleFunc("GET /api/health", h.Health)
 
 	// Blogs

@@ -8,6 +8,8 @@ import (
 type Config struct {
 	Port string
 
+	UploadDir string
+
 	JWTSecret       string
 	CORSAllowOrigin string
 
@@ -21,6 +23,8 @@ type Config struct {
 func FromEnv() Config {
 	return Config{
 		Port: env("PORT", "8082"),
+
+		UploadDir: env("UPLOAD_DIR", "uploads"),
 
 		JWTSecret:       env("JWT_SECRET", "mySecretKeyForJWTTokenGenerationAndValidationPurposeOnlyForDevelopmentAndTestingEnvironment"),
 		CORSAllowOrigin: env("CORS_ALLOW_ORIGIN", ""),
