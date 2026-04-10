@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 interface RegisterData {
   username: string;
