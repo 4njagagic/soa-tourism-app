@@ -8,6 +8,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
@@ -57,4 +59,22 @@ public class UserController {
             return ResponseEntity.notFound().build();
         }
     }
+
+    @GetMapping("/all")
+    @PreAuthorize("hasRole('ADMIN')")
+       public ResponseEntity<List<UserProfileDto>> getAllNonAdminUsers() {
+    return ResponseEntity.ok(userService.getNonAdminUsers());
+    }
+
+    @PatchMapping("/{id}/block")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> blockUser(@PathVariable Long id) {
+      try {
+        userService.blockUser(id);
+        return ResponseEntity.ok().build();
+      } catch (IllegalArgumentException e) {
+        return ResponseEntity.notFound().build();
+      }
+    }
+
 }

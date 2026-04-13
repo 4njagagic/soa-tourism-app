@@ -3,10 +3,16 @@ package com.soa.stakeholders.service;
 import com.soa.stakeholders.dto.UpdateProfileRequest;
 import com.soa.stakeholders.dto.UserProfileDto;
 import com.soa.stakeholders.model.User;
+import com.soa.stakeholders.model.UserRole;
 import com.soa.stakeholders.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+
+import java.util.stream.Collectors;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -74,6 +80,22 @@ public class UserService {
                 .profilePicture(user.getProfilePicture())
                 .biography(user.getBiography())
                 .motto(user.getMotto())
+                .enabled(user.getEnabled())
                 .build();
+    }
+
+    public List<UserProfileDto> getNonAdminUsers() {
+    return userRepository.findAll()
+            .stream()
+            .filter(user -> user.getRole() != UserRole.ADMIN) 
+            .map(this::mapToProfileDto)
+            .collect(Collectors.toList());
+    }
+    @Transactional
+    public void blockUser(Long userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        user.setEnabled(false); 
+    userRepository.save(user);
     }
 }

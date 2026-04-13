@@ -24,6 +24,7 @@ interface User {
   profilePicture?: string;
   biography?: string;
   motto?: string;
+  enabled: boolean;
 }
 
 interface AuthResponse {
@@ -77,6 +78,16 @@ export const userService = {
     const response = await client.put(`/users/${userId}`, data);
     return response.data;
   },
+
+  getAllUsers: async (): Promise<User[]> => {
+    const response = await client.get('/users/all');
+    return response.data;
+  },
+
+  blockUser: async (userId: number): Promise<void> => {
+    await client.patch(`/users/${userId}/block`);
+  },
+
 };
 
 export default client;

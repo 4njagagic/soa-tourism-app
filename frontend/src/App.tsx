@@ -12,6 +12,7 @@ import Profile from "./pages/Profile";
 import Blogs from "./pages/Blogs";
 import CreateBlog from "./pages/CreateBlog";
 import Navbar from "./components/Navbar";
+import AdminUsers from "./pages/AdminUsers";
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -21,13 +22,14 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({
 };
 
 function AppContent() {
+  const { user } = useAuth();
   return (
     <Router>
       <div className="min-h-screen">
         <Navbar />
         <main className="mx-auto w-full max-w-5xl px-4 py-6">
           <Routes>
-            <Route path="/" element={<Navigate to="/blogs" replace />} />
+            <Route path="/" element={<Navigate to={user?.role === 'ADMIN' ? "/admin-users" : "/blogs"}replace />} />
             <Route path="/blogs" element={<Blogs />} />
             <Route
               path="/blogs/new"
@@ -46,6 +48,14 @@ function AppContent() {
                   <Profile />
                 </PrivateRoute>
               }
+            />
+            <Route 
+              path="/admin-users" 
+              element={
+                <PrivateRoute>
+                  <AdminUsers />
+                </PrivateRoute>
+              } 
             />
           </Routes>
         </main>

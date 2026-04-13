@@ -30,7 +30,11 @@ const Login: React.FC = () => {
       });
 
       login(response.user, response.token);
-      navigate("/blogs");
+      if(response.user.role === "ADMIN"){
+        navigate("/admin-users");
+      }else {
+        navigate("/blogs");
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || "Login failed");
     } finally {
