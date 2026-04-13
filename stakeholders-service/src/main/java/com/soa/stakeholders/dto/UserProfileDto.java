@@ -21,4 +21,5 @@ public class UserProfileDto {
     private String profilePicture;
     private String biography;
     private String motto;
+    private Boolean enabled;
 }

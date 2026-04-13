@@ -35,20 +35,31 @@ const Navbar: React.FC = () => {
     <header className="sticky top-0 z-10 border-b bg-surface/90 backdrop-blur">
       <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
-          <Link to="/blogs" className="text-base font-semibold tracking-tight">
+          <Link to={user?.role === 'ADMIN' ? "/admin-users" : "/blogs"} className="text-base font-semibold tracking-tight">
             SOA Tourism
           </Link>
 
           <nav className="hidden items-center gap-1 sm:flex">
-            <NavLink to="/blogs" className={navLinkClass}>
-              Blogs
+               {user?.role !== "ADMIN" && (
+              <>
+                <NavLink to="/blogs" className={navLinkClass}>
+                  Blogs
+                </NavLink>
+                <NavLink
+                  to={isAuthenticated ? "/blogs/new" : "/login"}
+                  className={navLinkClass}
+                >
+                  Create
+                </NavLink>
+              </>
+            )}
+
+
+            {user?.role === "ADMIN" && (
+              <NavLink to="/admin-users" className={navLinkClass}>
+              Users
             </NavLink>
-            <NavLink
-              to={isAuthenticated ? "/blogs/new" : "/login"}
-              className={navLinkClass}
-            >
-              Create
-            </NavLink>
+           )}
           </nav>
         </div>
 
@@ -108,15 +119,24 @@ const Navbar: React.FC = () => {
 
       <nav className="mx-auto block w-full max-w-5xl px-4 pb-3 sm:hidden">
         <div className="flex gap-2">
-          <NavLink to="/blogs" className={navLinkClass}>
-            Blogs
+           {user?.role !== "ADMIN" && (
+            <>
+              <NavLink to="/blogs" className={navLinkClass}>
+                Blogs
+              </NavLink>
+              <NavLink
+                to={isAuthenticated ? "/blogs/new" : "/login"}
+                className={navLinkClass}
+              >
+                Create
+              </NavLink>
+            </>
+          )}
+          {user?.role === "ADMIN" && (
+          <NavLink to="/admin-users" className={navLinkClass}>
+            Users
           </NavLink>
-          <NavLink
-            to={isAuthenticated ? "/blogs/new" : "/login"}
-            className={navLinkClass}
-          >
-            Create
-          </NavLink>
+         )}
         </div>
       </nav>
     </header>
