@@ -18,6 +18,8 @@ export interface Blog {
   createdAt: string;
   imageUrls?: string[];
   authorUsername: string;
+  likesCount: number;
+  userHasLiked?: boolean;
 }
 
 export interface CreateBlogRequest {
@@ -88,6 +90,14 @@ export const blogService = {
   updateComment: async (commentId: string, text: string): Promise<Comment> => {
     const res = await blogClient.put(`/comments/${commentId}`, { text });
     return res.data;
+  },
+
+  likeBlog: async (blogId: string): Promise<void> => {
+    await blogClient.post(`/blogs/${blogId}/like`);
+  },
+
+  unlikeBlog: async (blogId: string): Promise<void> => {
+    await blogClient.delete(`/blogs/${blogId}/like`);
   },
 };
 

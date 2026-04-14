@@ -79,6 +79,9 @@ const BlogDetailView: React.FC<{
   cancelEdit: () => void;
   savingEdit: boolean;
   saveEdit: (e: React.FormEvent) => void;
+  likeLoading: boolean;
+  onLike: () => void;
+  onUnlike: () => void;
 }> = ({
   openBlog,
   loadingDetail,
@@ -99,6 +102,9 @@ const BlogDetailView: React.FC<{
   cancelEdit,
   savingEdit,
   saveEdit,
+  likeLoading,
+  onLike,
+  onUnlike,
 }) => {
   return (
     <div>
@@ -160,6 +166,28 @@ const BlogDetailView: React.FC<{
                 ))}
               </div>
             )}
+
+            <div className="mt-6 flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                {isAuthenticated && (
+                  <button
+                    type="button"
+                    onClick={openBlog?.userHasLiked ? onUnlike : onLike}
+                    disabled={likeLoading}
+                    className={`rounded-lg px-3 py-1 text-sm font-medium ${
+                      openBlog?.userHasLiked
+                        ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                        : 'bg-primary text-white hover:bg-primary-hover'
+                    } disabled:opacity-50`}
+                  >
+                    {likeLoading ? '...' : openBlog?.userHasLiked ? 'Unlike' : 'Like'}
+                  </button>
+                )}
+                <span className="text-sm text-text-secondary">
+                  {openBlog?.likesCount || 0} {openBlog?.likesCount === 1 ? 'like' : 'likes'}
+                </span>
+              </div>
+            </div>
 
             <section className="mt-6">
               <div className="flex items-center justify-between">
@@ -293,6 +321,8 @@ const Blogs: React.FC = () => {
   const [editingCommentId, setEditingCommentId] = useState("");
   const [editingText, setEditingText] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+
+  const [likeLoading, setLikeLoading] = useState(false);
 
   const [profiles, setProfiles] = useState<
     Record<string, { firstName?: string; lastName?: string }>
@@ -469,6 +499,52 @@ const Blogs: React.FC = () => {
     }
   };
 
+  const handleLike = async () => {
+    if (!openBlogId || !openBlog) return;
+
+    setLikeLoading(true);
+    setError("");
+    try {
+      await blogService.likeBlog(openBlogId);
+      // Update the blog state
+      const updatedBlog = {
+        ...openBlog,
+        likesCount: openBlog.likesCount + 1,
+        userHasLiked: true,
+      };
+      setOpenBlog(updatedBlog);
+      // Update the blogs list
+      setBlogs(blogs.map(b => b.id === openBlogId ? {...b, likesCount: b.likesCount + 1} : b));
+    } catch (e: any) {
+      setError(e?.response?.data?.error || "Failed to like blog");
+    } finally {
+      setLikeLoading(false);
+    }
+  };
+
+  const handleUnlike = async () => {
+    if (!openBlogId || !openBlog) return;
+
+    setLikeLoading(true);
+    setError("");
+    try {
+      await blogService.unlikeBlog(openBlogId);
+      // Update the blog state
+      const updatedBlog = {
+        ...openBlog,
+        likesCount: openBlog.likesCount - 1,
+        userHasLiked: false,
+      };
+      setOpenBlog(updatedBlog);
+      // Update the blogs list
+      setBlogs(blogs.map(b => b.id === openBlogId ? {...b, likesCount: b.likesCount - 1} : b));
+    } catch (e: any) {
+      setError(e?.response?.data?.error || "Failed to unlike blog");
+    } finally {
+      setLikeLoading(false);
+    }
+  };
+
   return (
     <div>
       {openBlogId ? (
@@ -492,6 +568,9 @@ const Blogs: React.FC = () => {
           cancelEdit={cancelEdit}
           savingEdit={savingEdit}
           saveEdit={saveEdit}
+          likeLoading={likeLoading}
+          onLike={handleLike}
+          onUnlike={handleUnlike}
         />
       ) : (
         <div>
@@ -573,6 +652,10 @@ const Blogs: React.FC = () => {
                       {b.description.length > 240
                         ? `${b.description.slice(0, 240)}…`
                         : b.description}
+                    </div>
+
+                    <div className="mt-2 text-xs text-text-muted">
+                      {b.likesCount || 0} {b.likesCount === 1 ? 'like' : 'likes'}
                     </div>
                   </article>
                 );
