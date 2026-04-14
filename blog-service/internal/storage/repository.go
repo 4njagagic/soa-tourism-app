@@ -18,3 +18,10 @@ type CommentRepository interface {
 	ListByBlogID(ctx context.Context, blogID domain.BlogID) ([]domain.Comment, error)
 	UpdateText(ctx context.Context, id domain.CommentID, newText string) (domain.Comment, error)
 }
+
+type LikeRepository interface {
+	AddLike(ctx context.Context, blogID domain.BlogID, userUsername string) error
+	RemoveLike(ctx context.Context, blogID domain.BlogID, userUsername string) error
+	HasLike(ctx context.Context, blogID domain.BlogID, userUsername string) (bool, error)
+	CountLikes(ctx context.Context, blogID domain.BlogID) (int, error)
+}
