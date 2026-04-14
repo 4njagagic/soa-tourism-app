@@ -8,6 +8,9 @@ interface ProfileData {
   biography?: string;
   profilePicture?: string;
   motto?: string;
+  email?: string;
+  newPassword?: string;
+  currentPassword?: string;
 }
 
 const Profile: React.FC = () => {
@@ -18,6 +21,9 @@ const Profile: React.FC = () => {
     biography: user?.biography || "",
     profilePicture: user?.profilePicture || "",
     motto: user?.motto || "",
+    email: user?.email || "",
+    newPassword: "",
+    currentPassword: "",
   });
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -39,6 +45,9 @@ const Profile: React.FC = () => {
         biography: profile.biography || "",
         profilePicture: profile.profilePicture || "",
         motto: profile.motto || "",
+        email: profile.email || "",
+        newPassword: "",
+        currentPassword: "",
       });
     } catch (error) {
       console.error("Failed to fetch profile:", error);
@@ -72,7 +81,8 @@ const Profile: React.FC = () => {
 
     setLoading(true);
     try {
-      await userService.updateProfile(user.id, profileData);
+      const { email, ...updateData } = profileData;
+      await userService.updateProfile(user.id, updateData);
       setMessage("Profile updated successfully!");
       setIsEditing(false);
       setTimeout(() => setMessage(""), 3000);
@@ -113,10 +123,13 @@ const Profile: React.FC = () => {
         <div
           className={
             message.toLowerCase().includes("success")
-              ? "mb-4 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success"
-              : "mb-4 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error"
+              ? "mb-4 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success flex items-center gap-2"
+              : "mb-4 rounded-lg border border-error/30 bg-error/10 px-4 py-3 text-sm text-error flex items-center gap-2"
           }
         >
+          <span className={message.toLowerCase().includes("success") ? "text-green-600" : "text-red-600"}>
+            {message.toLowerCase().includes("success") ? "✓" : "⚠"}
+          </span>
           {message}
         </div>
       )}
@@ -204,59 +217,99 @@ const Profile: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
+              <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+                <div className="rounded-lg border bg-surface p-4">
+                  <h3 className="text-base font-semibold text-text-primary mb-4">
+                    Personal Information
+                  </h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium text-text-secondary">
+                        First name
+                      </label>
+                      <input
+                        type="text"
+                        name="firstName"
+                        value={profileData.firstName}
+                        onChange={handleChange}
+                        className="mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-text-secondary">
+                        Last name
+                      </label>
+                      <input
+                        type="text"
+                        name="lastName"
+                        value={profileData.lastName}
+                        onChange={handleChange}
+                        className="mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
                     <label className="block text-sm font-medium text-text-secondary">
-                      First name
+                      Motto
                     </label>
                     <input
                       type="text"
-                      name="firstName"
-                      value={profileData.firstName}
+                      name="motto"
+                      value={profileData.motto}
                       onChange={handleChange}
                       className="mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
                     />
                   </div>
 
-                  <div>
+                  <div className="mt-4">
                     <label className="block text-sm font-medium text-text-secondary">
-                      Last name
+                      Biography
                     </label>
-                    <input
-                      type="text"
-                      name="lastName"
-                      value={profileData.lastName}
+                    <textarea
+                      name="biography"
+                      value={profileData.biography}
                       onChange={handleChange}
-                      className="mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+                      rows={5}
+                      className="mt-1 w-full resize-y rounded-lg border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary">
-                    Motto
-                  </label>
-                  <input
-                    type="text"
-                    name="motto"
-                    value={profileData.motto}
-                    onChange={handleChange}
-                    className="mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
-                  />
-                </div>
+                <div className="rounded-lg border bg-surface p-4">
+                  <h3 className="text-base font-semibold text-text-primary mb-4">
+                    Account Settings
+                  </h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-text-secondary">
+                        New password (leave empty to keep current)
+                      </label>
+                      <input
+                        type="password"
+                        name="newPassword"
+                        value={profileData.newPassword}
+                        onChange={handleChange}
+                        className="mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+                      />
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary">
-                    Biography
-                  </label>
-                  <textarea
-                    name="biography"
-                    value={profileData.biography}
-                    onChange={handleChange}
-                    rows={5}
-                    className="mt-1 w-full resize-y rounded-lg border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
-                  />
+                    {profileData.newPassword && (
+                      <div>
+                        <label className="block text-sm font-medium text-text-secondary">
+                          Current password (required to change password)
+                        </label>
+                        <input
+                          type="password"
+                          name="currentPassword"
+                          value={profileData.currentPassword}
+                          onChange={handleChange}
+                          className="mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-end gap-2">
