@@ -16,4 +16,7 @@ public class UpdateProfileRequest {
     private String profilePicture;
     private String biography;
     private String motto;
+    private String email;
+    private String newPassword;
+    private String currentPassword;
 }
