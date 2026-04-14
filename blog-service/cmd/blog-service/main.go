@@ -35,15 +35,17 @@ func main() {
 
 	blogRepo := postgres.NewBlogRepository(db)
 	commentRepo := postgres.NewCommentRepository(db)
+	likeRepo := postgres.NewLikeRepository(db)
 
 	blogSvc := service.NewBlogService(blogRepo)
 	commentSvc := service.NewCommentService(commentRepo)
+	likeSvc := service.NewLikeService(likeRepo)
 
 	if err := os.MkdirAll(cfg.UploadDir, 0o755); err != nil {
 		log.Fatalf("upload dir init error (%s): %v", filepath.Clean(cfg.UploadDir), err)
 	}
 
-	handler := handlers.New(blogSvc, commentSvc, cfg.UploadDir)
+	handler := handlers.New(blogSvc, commentSvc, likeSvc, cfg.UploadDir, cfg.JWTSecret)
 
 	h := httpapi.NewRouter(cfg, handler)
 	srv := &http.Server{

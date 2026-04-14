@@ -24,6 +24,14 @@ func Migrate(ctx context.Context, db *DB) error {
 			author_username TEXT NOT NULL
 		);`,
 		`CREATE INDEX IF NOT EXISTS idx_comments_blog_created_at ON comments(blog_id, created_at ASC);`,
+		`CREATE TABLE IF NOT EXISTS likes (
+			id TEXT PRIMARY KEY,
+			blog_id TEXT NOT NULL REFERENCES blogs(id) ON DELETE CASCADE,
+			user_username TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			UNIQUE(blog_id, user_username)
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_likes_blog_id ON likes(blog_id);`,
 	}
 
 	for _, stmt := range stmts {

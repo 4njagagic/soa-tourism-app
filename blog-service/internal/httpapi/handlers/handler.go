@@ -18,17 +18,21 @@ import (
 	"blog-service/internal/httpapi/middleware"
 	"blog-service/internal/service"
 
+	"blog-service/internal/auth"
+
 	"github.com/google/uuid"
 )
 
 type Handler struct {
 	Blogs     *service.BlogService
 	Comments  *service.CommentService
+	Likes     *service.LikeService
 	UploadDir string
+	JWTSecret string
 }
 
-func New(blogs *service.BlogService, comments *service.CommentService, uploadDir string) *Handler {
-	return &Handler{Blogs: blogs, Comments: comments, UploadDir: uploadDir}
+func New(blogs *service.BlogService, comments *service.CommentService, likes *service.LikeService, uploadDir string, jwtSecret string) *Handler {
+	return &Handler{Blogs: blogs, Comments: comments, Likes: likes, UploadDir: uploadDir, JWTSecret: jwtSecret}
 }
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +74,7 @@ func (h *Handler) CreateBlog(w http.ResponseWriter, r *http.Request) {
 			writeServiceError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusCreated, toBlogResponse(created))
+		writeJSON(w, http.StatusCreated, toBlogResponse(created, 0, nil))
 		return
 	}
 
@@ -91,7 +95,7 @@ func (h *Handler) CreateBlog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, toBlogResponse(created))
+	writeJSON(w, http.StatusCreated, toBlogResponse(created, 0, nil))
 }
 
 func (h *Handler) saveUploadedImages(form *multipart.Form) ([]string, error) {
@@ -182,7 +186,12 @@ func (h *Handler) ListBlogs(w http.ResponseWriter, r *http.Request) {
 
 	out := make([]dto.BlogResponse, 0, len(blogs))
 	for _, b := range blogs {
-		out = append(out, toBlogResponse(b))
+		likesCount, err := h.Likes.GetLikesCount(r.Context(), b.ID)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal error"})
+			return
+		}
+		out = append(out, toBlogResponse(b, likesCount, nil))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -198,7 +207,27 @@ func (h *Handler) GetBlog(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal error"})
 		return
 	}
-	writeJSON(w, http.StatusOK, toBlogResponse(blog))
+
+	likesCount, err := h.Likes.GetLikesCount(r.Context(), blog.ID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal error"})
+		return
+	}
+
+	var userHasLiked *bool
+	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" {
+		if username, err := auth.UsernameFromAuthorizationHeader(authHeader, h.JWTSecret); err == nil {
+			hasLiked, err := h.Likes.HasUserLiked(r.Context(), blog.ID, username)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal error"})
+				return
+			}
+			userHasLiked = &hasLiked
+		}
+	}
+
+	writeJSON(w, http.StatusOK, toBlogResponse(blog, likesCount, userHasLiked))
 }
 
 func (h *Handler) AddComment(w http.ResponseWriter, r *http.Request) {
@@ -282,6 +311,40 @@ func (h *Handler) UpdateComment(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toCommentResponse(updated))
 }
 
+func (h *Handler) LikeBlog(w http.ResponseWriter, r *http.Request) {
+	username, ok := middleware.UsernameFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		return
+	}
+
+	blogID := r.PathValue("id")
+	err := h.Likes.LikeBlog(r.Context(), domain.BlogID(blogID), username)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal error"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"message": "liked"})
+}
+
+func (h *Handler) UnlikeBlog(w http.ResponseWriter, r *http.Request) {
+	username, ok := middleware.UsernameFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		return
+	}
+
+	blogID := r.PathValue("id")
+	err := h.Likes.UnlikeBlog(r.Context(), domain.BlogID(blogID), username)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal error"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"message": "unliked"})
+}
+
 func writeServiceError(w http.ResponseWriter, err error) {
 	if service.IsValidation(err) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
@@ -290,7 +353,7 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal error"})
 }
 
-func toBlogResponse(b domain.Blog) dto.BlogResponse {
+func toBlogResponse(b domain.Blog, likesCount int, userHasLiked *bool) dto.BlogResponse {
 	return dto.BlogResponse{
 		ID:             string(b.ID),
 		Title:          b.Title,
@@ -298,6 +361,8 @@ func toBlogResponse(b domain.Blog) dto.BlogResponse {
 		CreatedAt:      b.CreatedAt.Format(time.RFC3339),
 		ImageURLs:      b.ImageURLs,
 		AuthorUsername: b.AuthorUsername,
+		LikesCount:     likesCount,
+		UserHasLiked:   userHasLiked,
 	}
 }
 

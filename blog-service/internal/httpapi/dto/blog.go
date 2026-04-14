@@ -9,10 +9,12 @@ type CreateBlogRequest struct {
 }
 
 type BlogResponse struct {
-	ID             string   `json:"id"`
-	Title          string   `json:"title"`
-	Description    string   `json:"description"`
-	CreatedAt      string   `json:"createdAt"`
+	ID             string `json:"id"`
+	Title          string `json:"title"`
+	Description    string `json:"description"`
+	CreatedAt      string `json:"createdAt"`
 	ImageURLs      []string `json:"imageUrls,omitempty"`
-	AuthorUsername string   `json:"authorUsername"`
+	AuthorUsername string `json:"authorUsername"`
+	LikesCount     int    `json:"likesCount"`
+	UserHasLiked   *bool  `json:"userHasLiked,omitempty"`
 }
