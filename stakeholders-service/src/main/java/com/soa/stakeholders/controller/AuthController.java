@@ -18,9 +18,6 @@ public class AuthController {
 
     private final AuthService authService;
 
-    /**
-     * Funkcionalnost 1: Registracija korisnika
-     */
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         try {
@@ -34,9 +31,6 @@ public class AuthController {
         }
     }
 
-    /**
-     * Login korisnika
-     */
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         try {

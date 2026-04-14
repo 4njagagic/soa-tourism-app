@@ -20,12 +20,8 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
-    /**
-     * Funkcionalnost 1: Registracija novog korisnika
-     */
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        // Proveravamo da li korisnik već postoji
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new IllegalArgumentException("Username already exists");
         }
@@ -34,7 +30,6 @@ public class AuthService {
             throw new IllegalArgumentException("Email already exists");
         }
 
-        // Kreiramo novog korisnika
         User user = User.builder()
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
@@ -45,7 +40,6 @@ public class AuthService {
 
         user = userRepository.save(user);
 
-        // Generisemo JWT token
         String token = jwtService.generateToken(user);
 
         UserProfileDto profileDto = mapToProfileDto(user);
@@ -57,9 +51,6 @@ public class AuthService {
                 .build();
     }
 
-    /**
-     * Login korisnika
-     */
     public AuthResponse login(String username, String password) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));

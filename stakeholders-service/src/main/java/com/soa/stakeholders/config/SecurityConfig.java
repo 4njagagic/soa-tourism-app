@@ -44,8 +44,6 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authorize -> authorize
-                // NOTE: application.yml sets `server.servlet.context-path: /api`, so matchers must NOT include `/api`.
-                // Some servlet containers/security matchers may include context-path; allow both to be safe.
                 .requestMatchers("/auth/**", "/api/auth/**").permitAll()
                 .requestMatchers("/users/profile/**", "/api/users/profile/**").permitAll()
                 .anyRequest().authenticated()

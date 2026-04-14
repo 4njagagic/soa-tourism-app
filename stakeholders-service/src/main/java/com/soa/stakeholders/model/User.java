@@ -46,7 +46,7 @@ public class User implements UserDetails {
     @Column(columnDefinition = "TEXT")
     private String biography;
 
-    private String motto; // Citat
+    private String motto; 
 
     @Column(nullable = false)
     @Builder.Default

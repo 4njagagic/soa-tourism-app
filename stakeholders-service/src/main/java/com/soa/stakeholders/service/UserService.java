@@ -22,9 +22,6 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    /**
-     * Funkcionalnost 2: Pregled profila korisnika
-     */
     public UserProfileDto getProfile(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -32,9 +29,6 @@ public class UserService {
         return mapToProfileDto(user);
     }
 
-    /**
-     * Pregled profila po username-u
-     */
     public UserProfileDto getProfileByUsername(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -42,9 +36,6 @@ public class UserService {
         return mapToProfileDto(user);
     }
 
-    /**
-     * Ažuriranje profila korisnika
-     */
     @Transactional
     public UserProfileDto updateProfile(Long userId, UpdateProfileRequest request) {
         User user = userRepository.findById(userId)
