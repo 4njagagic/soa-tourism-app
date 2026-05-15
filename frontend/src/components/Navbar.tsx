@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import ToursNavDropdown from "./ToursNavDropdown";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   [
@@ -31,16 +32,26 @@ const Navbar: React.FC = () => {
     navigate("/login");
   };
 
+  const homePath =
+    user?.role === "ADMIN"
+      ? "/admin-users"
+      : user?.role === "GUIDE"
+        ? "/tours"
+        : "/blogs";
+
+  const showToursLink =
+    isAuthenticated && (user?.role === "GUIDE" || user?.role === "TOURIST");
+
   return (
     <header className="sticky top-0 z-10 border-b bg-surface/90 backdrop-blur">
       <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
-          <Link to={user?.role === 'ADMIN' ? "/admin-users" : "/blogs"} className="text-base font-semibold tracking-tight">
+          <Link to={homePath} className="text-base font-semibold tracking-tight">
             SOA Tourism
           </Link>
 
           <nav className="hidden items-center gap-1 sm:flex">
-               {user?.role !== "ADMIN" && (
+            {user?.role !== "ADMIN" && (
               <>
                 <NavLink to="/blogs" className={navLinkClass}>
                   Blogs
@@ -49,17 +60,24 @@ const Navbar: React.FC = () => {
                   to={isAuthenticated ? "/blogs/new" : "/login"}
                   className={navLinkClass}
                 >
-                  Create
+                  Create blog
                 </NavLink>
+                {showToursLink &&
+                  (user?.role === "GUIDE" ? (
+                    <ToursNavDropdown variant="desktop" />
+                  ) : (
+                    <NavLink to="/tours" className={navLinkClass}>
+                      Tours
+                    </NavLink>
+                  ))}
               </>
             )}
 
-
             {user?.role === "ADMIN" && (
               <NavLink to="/admin-users" className={navLinkClass}>
-              Users
-            </NavLink>
-           )}
+                Users
+              </NavLink>
+            )}
           </nav>
         </div>
 
@@ -118,8 +136,8 @@ const Navbar: React.FC = () => {
       </div>
 
       <nav className="mx-auto block w-full max-w-5xl px-4 pb-3 sm:hidden">
-        <div className="flex gap-2">
-           {user?.role !== "ADMIN" && (
+        <div className="flex flex-wrap gap-2">
+          {user?.role !== "ADMIN" && (
             <>
               <NavLink to="/blogs" className={navLinkClass}>
                 Blogs
@@ -128,15 +146,23 @@ const Navbar: React.FC = () => {
                 to={isAuthenticated ? "/blogs/new" : "/login"}
                 className={navLinkClass}
               >
-                Create
+                Create blog
               </NavLink>
+              {showToursLink &&
+                (user?.role === "GUIDE" ? (
+                  <ToursNavDropdown variant="mobile" />
+                ) : (
+                  <NavLink to="/tours" className={navLinkClass}>
+                    Tours
+                  </NavLink>
+                ))}
             </>
           )}
           {user?.role === "ADMIN" && (
-          <NavLink to="/admin-users" className={navLinkClass}>
-            Users
-          </NavLink>
-         )}
+            <NavLink to="/admin-users" className={navLinkClass}>
+              Users
+            </NavLink>
+          )}
         </div>
       </nav>
     </header>

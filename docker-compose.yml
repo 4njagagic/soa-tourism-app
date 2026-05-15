@@ -37,6 +37,26 @@ services:
       timeout: 5s
       retries: 5
 
+  mongo:
+    image: mongo:7
+    container_name: tour-mongo
+    ports:
+      - "${TOUR_MONGO_HOST_PORT:-27017}:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${TOUR_MONGO_ROOT_USER:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${TOUR_MONGO_ROOT_PASSWORD:-rootpass}
+      MONGO_INITDB_DATABASE: ${TOUR_MONGO_DB_NAME:-tourism}
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
   stakeholders-service:
     build:
       context: ./stakeholders-service
@@ -85,6 +105,31 @@ services:
       - soa-network
     restart: unless-stopped
 
+  tour-service:
+    build:
+      context: ./tour-service
+      dockerfile: Dockerfile
+    container_name: tour-service
+    environment:
+      ASPNETCORE_URLS: http://+:${TOUR_SERVICE_PORT:-8083}
+      TOUR_MONGO_URI: ${TOUR_MONGO_URI:-mongodb://root:rootpass@mongo:27017}
+      TOUR_MONGO_DB_NAME: ${TOUR_MONGO_DB_NAME:-tourism}
+      JWT_SECRET: ${JWT_SECRET}
+      STAKEHOLDERS_SERVICE_URL: http://stakeholders-service:${STAKEHOLDERS_SERVICE_PORT}/api
+      UPLOAD_DIR: /app/uploads
+    ports:
+      - "${TOUR_SERVICE_PORT:-8083}:${TOUR_SERVICE_PORT:-8083}"
+    volumes:
+      - tour-uploads-data:/app/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+      stakeholders-service:
+        condition: service_started
+    networks:
+      - soa-network
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend
@@ -92,12 +137,14 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL}
         VITE_BLOG_API_URL: ${VITE_BLOG_API_URL}
+        VITE_TOUR_API_URL: ${VITE_TOUR_API_URL}
     container_name: soa-tourism-frontend
     ports:
       - "${FRONTEND_HOST_PORT}:${FRONTEND_CONTAINER_PORT}"
     depends_on:
       - stakeholders-service
       - blog-service
+      - tour-service
     networks:
       - soa-network
     restart: unless-stopped
@@ -106,6 +153,8 @@ volumes:
   postgres-data:
   blog-postgres-data:
   blog-uploads-data:
+  mongo-data:
+  tour-uploads-data:
 
 networks:
   soa-network:
