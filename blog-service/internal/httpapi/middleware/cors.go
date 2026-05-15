@@ -2,8 +2,6 @@ package middleware
 
 import "net/http"
 
-// CORS is a minimal dev-friendly CORS middleware.
-// If allowOrigin is empty, it allows any origin.
 func CORS(allowOrigin string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")

@@ -14,8 +14,6 @@ var (
 	ErrInvalidToken      = errors.New("invalid token")
 )
 
-// UsernameFromAuthorizationHeader validates HS512 JWT and returns the subject (username).
-// This matches stakeholders-service where JWT subject is set to username.
 func UsernameFromAuthorizationHeader(authorizationHeader string, secret string) (string, error) {
 	if strings.TrimSpace(authorizationHeader) == "" {
 		return "", ErrMissingAuthHeader
