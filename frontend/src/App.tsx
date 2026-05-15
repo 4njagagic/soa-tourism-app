@@ -11,6 +11,9 @@ import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import Blogs from "./pages/Blogs";
 import CreateBlog from "./pages/CreateBlog";
+import Tours from "./pages/Tours";
+import CreateTour from "./pages/CreateTour";
+import AddKeyPoint from "./pages/AddKeyPoint";
 import Navbar from "./components/Navbar";
 import AdminUsers from "./pages/AdminUsers";
 
@@ -29,13 +32,51 @@ function AppContent() {
         <Navbar />
         <main className="mx-auto w-full max-w-5xl px-4 py-6">
           <Routes>
-            <Route path="/" element={<Navigate to={user?.role === 'ADMIN' ? "/admin-users" : "/blogs"}replace />} />
+            <Route
+              path="/"
+              element={
+                <Navigate
+                  to={
+                    user?.role === "ADMIN"
+                      ? "/admin-users"
+                      : user?.role === "GUIDE" || user?.role === "TOURIST"
+                        ? "/tours"
+                        : "/blogs"
+                  }
+                  replace
+                />
+              }
+            />
             <Route path="/blogs" element={<Blogs />} />
             <Route
               path="/blogs/new"
               element={
                 <PrivateRoute>
                   <CreateBlog />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/tours"
+              element={
+                <PrivateRoute>
+                  <Tours />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/tours/new"
+              element={
+                <PrivateRoute>
+                  <CreateTour />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/tours/:tourId/key-points/new"
+              element={
+                <PrivateRoute>
+                  <AddKeyPoint />
                 </PrivateRoute>
               }
             />
