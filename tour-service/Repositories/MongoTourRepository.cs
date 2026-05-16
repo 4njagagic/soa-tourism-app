@@ -97,7 +97,7 @@ public async Task<Tour?> UpdateKeyPointAsync(string id, string authorUsername, K
     var options = new FindOneAndUpdateOptions<Tour>
     {
         ReturnDocument = ReturnDocument.After,
-        ArrayFilters = new[] { new BsonDocumentArrayFilterDefinition<BsonDocument>(new BsonDocument("elem._id", keyPoint.Id)) }
+        ArrayFilters = new[] { new BsonDocumentArrayFilterDefinition<BsonDocument>(new BsonDocument("elem._id", ObjectId.Parse(keyPoint.Id))) }
     };
 
     return await _tours.FindOneAndUpdateAsync(filter, update, options, cancellationToken);

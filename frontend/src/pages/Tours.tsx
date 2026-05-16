@@ -8,6 +8,7 @@ import {
   resolveTourAssetUrl,
   tourService,
 } from "../services/tourApi";
+import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
 
 type LocationState = { openTourId?: string };
 
@@ -92,6 +93,7 @@ const Tours: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [userRating, setUserRating] = useState(5);
+  const [showMap, setShowMap] = useState(false);
 
   const openTour = useMemo(
     () => tours.find((tour) => tour.id === openTourId) || null,
@@ -126,7 +128,7 @@ const Tours: React.FC = () => {
       void loadTours();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isGuide, isTourist]);
+  }, [isGuide, isTourist, location]);
 
   if (!isGuide && !isTourist) {
     return (
@@ -211,45 +213,87 @@ const Tours: React.FC = () => {
           </div>
 
           <section className="mt-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold">Key points</h2>
-              <div className="text-xs text-text-muted">
-                {openTour.keyPoints.length} total
-              </div>
-            </div>
+           <div className="flex items-center justify-between">
+    <h2 className="text-base font-semibold">Key points</h2>
+    <div className="flex gap-2">
+      {openTour.keyPoints.length > 0 && (
+        <button 
+          onClick={() => setShowMap(!showMap)}
+          className="text-xs font-medium text-primary hover:underline"
+        >
+          {showMap ? "Hide Map" : "Show Route on Map"}
+        </button>
+      )}
+      <div className="text-xs text-text-muted">{openTour.keyPoints.length} total</div>
+    </div>
+  </div>
 
-            {openTour.keyPoints.length === 0 ? (
-              <div className="mt-3 rounded-lg border bg-muted p-4 text-sm text-text-secondary">
-                {isGuide
-                  ? "No key points yet. Add the first location on the map."
-                  : "This tour has no key points yet."}
-              </div>
-            ) : (
-              <div className="mt-3 space-y-2">
-                {openTour.keyPoints.map((point) => (
-                  <button
-                    key={point.id}
-                    type="button"
-                    onClick={() => setSelectedKeyPoint(point)}
-                    className="w-full rounded-lg border bg-surface p-4 text-left transition-colors hover:border-primary hover:bg-primary-soft/30"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="font-semibold text-text-primary">
-                          {point.name}
-                        </h3>
-                        <p className="mt-1 line-clamp-2 text-sm text-text-secondary">
-                          {point.description}
-                        </p>
-                      </div>
-                      <span className="shrink-0 text-xs text-primary">
-                        View details
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
+  {/* MAPA SA LINIJAMA (POLYLINE) */}
+  {showMap && openTour.keyPoints.length > 0 && (
+    <div className="mt-4 h-[350px] w-full rounded-xl border overflow-hidden">
+      <MapContainer 
+        center={[openTour.keyPoints[0].latitude, openTour.keyPoints[0].longitude]} 
+        zoom={13} 
+        className="h-full w-full"
+      >
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        {/* Markeri za svaku tačku */}
+        {openTour.keyPoints.map((kp) => (
+          <Marker key={kp.id} position={[kp.latitude, kp.longitude]}>
+            <Popup>{kp.name}</Popup>
+          </Marker>
+        ))}
+        {/* LINIJA KOJA POVEZUJE TAČKE */}
+        <Polyline 
+          positions={openTour.keyPoints.map(kp => [kp.latitude, kp.longitude])} 
+          color="blue" 
+          weight={4}
+          opacity={0.6}
+        />
+      </MapContainer>
+    </div>
+  )}
+
+  {/* IZMENJENA LISTA TAČAKA SA EDIT/DELETE DUGMIĆIMA */}
+  <div className="mt-3 space-y-2">
+    {openTour.keyPoints.map((point) => (
+      <div key={point.id} className="group relative rounded-lg border bg-surface p-4 transition-colors hover:border-primary">
+        <div className="flex items-start justify-between">
+          <button onClick={() => setSelectedKeyPoint(point)} className="text-left">
+            <h3 className="font-semibold text-text-primary">{point.name}</h3>
+            <p className="mt-1 line-clamp-1 text-sm text-text-secondary">{point.description}</p>
+          </button>
+          
+          <div className="flex gap-2">
+            {isGuide && (
+              <>
+                <button 
+                  onClick={() => navigate(`/tours/${openTour.id}/key-points/${point.id}/edit`)}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Edit
+                </button>
+                <button 
+                  onClick={async () => {
+                    if (window.confirm("Delete this point?")) {
+                      const updated = await tourService.deleteKeyPoint(openTour.id, point.id);
+                      setTours(tours.map(t => t.id === updated.id ? updated : t));
+                    }
+                  }}
+                  className="text-xs text-error hover:underline"
+                >
+                  Delete
+                </button>
+              </>
             )}
+            <button onClick={() => setSelectedKeyPoint(point)} className="text-xs text-primary font-medium">
+              View
+            </button>
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
           </section>
 
           <section className="mt-10 border-t pt-8">

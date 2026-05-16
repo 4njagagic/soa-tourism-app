@@ -138,6 +138,33 @@ export const tourService = {
     });
     return res.data;
   },
+
+  updateKeyPoint: async (
+    tourId: string,
+    pointId: string,
+    data: {
+      name: string;
+      description: string;
+      latitude: number;
+      longitude: number;
+      image?: File;
+    }
+  ): Promise<Tour> => {
+    const form = new FormData();
+    form.append("name", data.name);
+    form.append("description", data.description);
+    form.append("latitude", String(data.latitude));
+    form.append("longitude", String(data.longitude));
+    if (data.image) form.append("image", data.image);
+
+    const res = await tourClient.put(`/tours/${tourId}/key-points/${pointId}`, form);
+    return res.data;
+  },
+
+  deleteKeyPoint: async (tourId: string, pointId: string): Promise<Tour> => {
+    const res = await tourClient.delete(`/tours/${tourId}/key-points/${pointId}`);
+    return res.data;
+  },
 };
 
 export default tourClient;

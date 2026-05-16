@@ -16,6 +16,7 @@ import CreateTour from "./pages/CreateTour";
 import AddKeyPoint from "./pages/AddKeyPoint";
 import Navbar from "./components/Navbar";
 import AdminUsers from "./pages/AdminUsers";
+import EditKeyPoint from "./pages/EditKeyPoint";
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -98,6 +99,14 @@ function AppContent() {
                 </PrivateRoute>
               } 
             />
+            <Route
+  path="/tours/:tourId/key-points/:pointId/edit"
+  element={
+    <PrivateRoute>
+      <EditKeyPoint />
+    </PrivateRoute>
+  }
+/>
           </Routes>
         </main>
       </div>
