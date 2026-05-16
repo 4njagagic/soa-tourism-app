@@ -19,6 +19,7 @@ builder.Configuration["Uploads:Directory"] =
 
 builder.Services.Configure<TourDatabaseSettings>(builder.Configuration.GetSection("TourDatabase"));
 builder.Services.AddSingleton<ITourRepository, MongoTourRepository>();
+builder.Services.AddSingleton<IUserPositionRepository, MongoUserPositionRepository>();
 builder.Services.AddScoped<ITourService, TourManagementService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddHttpClient("stakeholders", client =>
