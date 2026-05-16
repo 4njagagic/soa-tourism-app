@@ -15,4 +15,6 @@ public interface ITourRepository
     Task<Tour?> GetByIdAndAuthorAsync(string id, string authorUsername, CancellationToken cancellationToken);
 
     Task<Tour?> AddKeyPointAsync(string id, string authorUsername, KeyPoint keyPoint, CancellationToken cancellationToken);
+
+    Task<Tour?> AddReviewAsync(string tourId, Review review, CancellationToken cancellationToken);
 }

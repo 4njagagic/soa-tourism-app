@@ -11,6 +11,15 @@ public record KeyPointResponse(
     string ImageUrl,
     DateTime CreatedAt);
 
+public record ReviewResponse(
+    string Id,
+    int Rating,
+    string Comment,
+    string TouristUsername,
+    DateTime VisitDate,
+    DateTime CommentDate,
+    List<string> Images);
+    
 public record TourResponse(
     string Id,
     string Name,
@@ -21,6 +30,7 @@ public record TourResponse(
     decimal Price,
     string AuthorUsername,
     List<KeyPointResponse> KeyPoints,
+    List<ReviewResponse> Reviews,
     DateTime CreatedAt,
     DateTime UpdatedAt)
 {
@@ -43,6 +53,8 @@ public record TourResponse(
                 kp.Longitude,
                 kp.ImageUrl,
                 kp.CreatedAt)).ToList(),
+            tour.Reviews.Select(r => new ReviewResponse(
+                r.Id, r.Rating, r.Comment, r.TouristUsername, r.VisitDate, r.CommentDate, r.Images)).ToList(),
             tour.CreatedAt,
             tour.UpdatedAt);
     }

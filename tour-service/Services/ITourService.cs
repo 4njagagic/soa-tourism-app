@@ -15,4 +15,6 @@ public interface ITourService
     Task<TourResponse?> GetMyTourAsync(string id, string authorUsername, CancellationToken cancellationToken);
 
     Task<TourResponse?> AddKeyPointAsync(string id, AddKeyPointRequest request, string authorUsername, CancellationToken cancellationToken);
+
+    Task<TourResponse?> AddReviewAsync(string tourId, AddReviewRequest request, string touristUsername, CancellationToken cancellationToken);
 }

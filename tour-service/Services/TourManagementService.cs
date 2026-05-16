@@ -128,4 +128,30 @@ public class TourManagementService : ITourService
             ? configured
             : Path.Combine(_environment.ContentRootPath, configured);
     }
+
+    public async Task<TourResponse?> AddReviewAsync(string tourId, AddReviewRequest request, string touristUsername, CancellationToken cancellationToken)
+{
+    var imageUrls = new List<string>();
+    
+    if (request.Images != null && request.Images.Any())
+    {
+        foreach (var file in request.Images)
+        {
+            var url = await SaveImageAsync(file, cancellationToken);
+            imageUrls.Add(url);
+        }
+    }
+
+    var review = new Review
+    {
+        Rating = request.Rating,
+        Comment = request.Comment.Trim(),
+        TouristUsername = touristUsername,
+        VisitDate = request.VisitDate,
+        Images = imageUrls
+    };
+
+    var updated = await _repository.AddReviewAsync(tourId, review, cancellationToken);
+    return updated is null ? null : TourResponse.FromTour(updated);
+}
 }

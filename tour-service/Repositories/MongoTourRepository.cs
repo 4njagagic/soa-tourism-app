@@ -67,4 +67,17 @@ public class MongoTourRepository : ITourRepository
             },
             cancellationToken);
     }
+    public async Task<Tour?> AddReviewAsync(string tourId, Review review, CancellationToken cancellationToken)
+{
+    var filter = Builders<Tour>.Filter.Eq(t => t.Id, tourId);
+    var update = Builders<Tour>.Update
+        .Push(t => t.Reviews, review)
+        .Set(t => t.UpdatedAt, DateTime.UtcNow);
+
+    return await _tours.FindOneAndUpdateAsync(
+        filter,
+        update,
+        new FindOneAndUpdateOptions<Tour> { ReturnDocument = ReturnDocument.After },
+        cancellationToken);
+}
 }
