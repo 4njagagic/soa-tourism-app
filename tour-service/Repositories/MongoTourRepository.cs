@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using TourService.Models;
 using TourService.Services;
+using MongoDB.Bson;
 
 namespace TourService.Repositories;
 
@@ -79,5 +80,36 @@ public class MongoTourRepository : ITourRepository
         update,
         new FindOneAndUpdateOptions<Tour> { ReturnDocument = ReturnDocument.After },
         cancellationToken);
+}
+
+public async Task<Tour?> UpdateKeyPointAsync(string id, string authorUsername, KeyPoint keyPoint, CancellationToken cancellationToken)
+{
+    
+    var filter = Builders<Tour>.Filter.Where(t => t.Id == id && t.AuthorUsername == authorUsername);
+    var update = Builders<Tour>.Update
+        .Set("KeyPoints.$[elem].Name", keyPoint.Name)
+        .Set("KeyPoints.$[elem].Description", keyPoint.Description)
+        .Set("KeyPoints.$[elem].Latitude", keyPoint.Latitude)
+        .Set("KeyPoints.$[elem].Longitude", keyPoint.Longitude)
+        .Set("KeyPoints.$[elem].ImageUrl", keyPoint.ImageUrl)
+        .Set(t => t.UpdatedAt, DateTime.UtcNow);
+
+    var options = new FindOneAndUpdateOptions<Tour>
+    {
+        ReturnDocument = ReturnDocument.After,
+        ArrayFilters = new[] { new BsonDocumentArrayFilterDefinition<BsonDocument>(new BsonDocument("elem._id", keyPoint.Id)) }
+    };
+
+    return await _tours.FindOneAndUpdateAsync(filter, update, options, cancellationToken);
+}
+
+public async Task<Tour?> DeleteKeyPointAsync(string id, string authorUsername, string pointId, CancellationToken cancellationToken)
+{
+    var filter = Builders<Tour>.Filter.Where(t => t.Id == id && t.AuthorUsername == authorUsername);
+    var update = Builders<Tour>.Update
+        .PullFilter(t => t.KeyPoints, kp => kp.Id == pointId)
+        .Set(t => t.UpdatedAt, DateTime.UtcNow);
+
+    return await _tours.FindOneAndUpdateAsync(filter, update, new FindOneAndUpdateOptions<Tour> { ReturnDocument = ReturnDocument.After }, cancellationToken);
 }
 }

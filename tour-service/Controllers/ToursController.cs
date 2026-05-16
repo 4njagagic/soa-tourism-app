@@ -101,4 +101,29 @@ public async Task<ActionResult<TourResponse>> AddReview(string id, [FromForm] Ad
     var tour = await _tourService.AddReviewAsync(id, request, user.Username, cancellationToken);
     return tour is null ? NotFound(new { error = "Tour not found." }) : tour;
 }
+
+[HttpPut("{id}/key-points/{pointId}")]
+[RequestSizeLimit(10 * 1024 * 1024)]
+public async Task<ActionResult<TourResponse>> UpdateKeyPoint(string id, string pointId, [FromForm] UpdateKeyPointRequest request, CancellationToken cancellationToken)
+{
+    var author = await _authService.RequireGuideAsync(Request, cancellationToken);
+    if (author is null) return Unauthorized(new { error = "Only guides can manage points." });
+
+    try
+    {
+        var tour = await _tourService.UpdateKeyPointAsync(id, pointId, request, author.Username, cancellationToken);
+        return tour is null ? NotFound(new { error = "Tour or point not found." }) : tour;
+    }
+    catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+}
+
+[HttpDelete("{id}/key-points/{pointId}")]
+public async Task<ActionResult<TourResponse>> DeleteKeyPoint(string id, string pointId, CancellationToken cancellationToken)
+{
+    var author = await _authService.RequireGuideAsync(Request, cancellationToken);
+    if (author is null) return Unauthorized(new { error = "Only guides can delete points." });
+
+    var tour = await _tourService.DeleteKeyPointAsync(id, pointId, author.Username, cancellationToken);
+    return tour is null ? NotFound(new { error = "Tour not found." }) : tour;
+}
 }

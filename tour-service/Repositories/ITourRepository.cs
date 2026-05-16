@@ -17,4 +17,7 @@ public interface ITourRepository
     Task<Tour?> AddKeyPointAsync(string id, string authorUsername, KeyPoint keyPoint, CancellationToken cancellationToken);
 
     Task<Tour?> AddReviewAsync(string tourId, Review review, CancellationToken cancellationToken);
+
+    Task<Tour?> UpdateKeyPointAsync(string id, string authorUsername, KeyPoint keyPoint, CancellationToken cancellationToken);
+Task<Tour?> DeleteKeyPointAsync(string id, string authorUsername, string pointId, CancellationToken cancellationToken);
 }
