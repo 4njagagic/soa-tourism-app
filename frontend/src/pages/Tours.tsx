@@ -94,6 +94,7 @@ const Tours: React.FC = () => {
   const [error, setError] = useState("");
   const [userRating, setUserRating] = useState(5);
   const [showMap, setShowMap] = useState(false);
+  const [routeCoords, setRouteCoords] = useState<[number, number][]>([]);
 
   const openTour = useMemo(
     () => tours.find((tour) => tour.id === openTourId) || null,
@@ -115,6 +116,40 @@ const Tours: React.FC = () => {
     }
   };
 
+  const fetchRoute = async () => {
+  if (!openTour || openTour.keyPoints.length < 2) {
+    setRouteCoords(openTour?.keyPoints.map(kp => [kp.latitude, kp.longitude] as [number, number]) || []);
+    return;
+  }
+
+  try {
+    const query = openTour.keyPoints
+      .map((kp) => `${kp.longitude},${kp.latitude}`)
+      .join(";");
+
+    const response = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${query}?overview=full&geometries=geojson`
+    );
+    const data = await response.json();
+
+    if (data.code === "Ok" && data.routes && data.routes.length > 0) {
+      const coords = data.routes[0].geometry.coordinates.map(
+        (c: [number, number]) => [c[1], c[0]] as [number, number]
+      );
+      setRouteCoords(coords);
+    } else {
+      throw new Error("OSRM route not found");
+    }
+  } catch (err) {
+    console.error("OSRM Routing failed, falling back to straight lines", err);
+    setRouteCoords(openTour.keyPoints.map(kp => [kp.latitude, kp.longitude] as [number, number]));
+  }
+};
+useEffect(() => {
+  if (showMap && openTour) {
+    void fetchRoute();
+  }
+}, [showMap, openTour]);
   useEffect(() => {
     const state = (location.state || {}) as LocationState;
     if (state.openTourId) {
@@ -127,7 +162,6 @@ const Tours: React.FC = () => {
     if (isGuide || isTourist) {
       void loadTours();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGuide, isTourist, location]);
 
   if (!isGuide && !isTourist) {
@@ -237,24 +271,21 @@ const Tours: React.FC = () => {
         className="h-full w-full"
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        {/* Markeri za svaku tačku */}
         {openTour.keyPoints.map((kp) => (
           <Marker key={kp.id} position={[kp.latitude, kp.longitude]}>
             <Popup>{kp.name}</Popup>
           </Marker>
         ))}
-        {/* LINIJA KOJA POVEZUJE TAČKE */}
         <Polyline 
-          positions={openTour.keyPoints.map(kp => [kp.latitude, kp.longitude])} 
-          color="blue" 
-          weight={4}
-          opacity={0.6}
+          positions={routeCoords} 
+          color="#3b82f6" 
+          weight={5}
+          opacity={0.7}
         />
       </MapContainer>
     </div>
   )}
 
-  {/* IZMENJENA LISTA TAČAKA SA EDIT/DELETE DUGMIĆIMA */}
   <div className="mt-3 space-y-2">
     {openTour.keyPoints.map((point) => (
       <div key={point.id} className="group relative rounded-lg border bg-surface p-4 transition-colors hover:border-primary">
