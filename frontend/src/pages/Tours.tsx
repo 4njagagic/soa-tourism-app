@@ -91,6 +91,7 @@ const Tours: React.FC = () => {
   const [selectedKeyPoint, setSelectedKeyPoint] = useState<KeyPoint | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [userRating, setUserRating] = useState(5);
 
   const openTour = useMemo(
     () => tours.find((tour) => tour.id === openTourId) || null,
@@ -249,6 +250,118 @@ const Tours: React.FC = () => {
                 ))}
               </div>
             )}
+          </section>
+
+          <section className="mt-10 border-t pt-8">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Tourist Reviews</h2>
+              <div className="text-sm text-text-muted">
+                {openTour.reviews.length} reviews
+              </div>
+            </div>
+
+            {/* Forma za ostavljanje recenzije (samo za Turiste) */}
+            {isTourist && (
+              <div className="mt-6 rounded-xl border bg-muted/30 p-5">
+                <h3 className="font-medium">Leave a review</h3>
+                <form 
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const target = e.target as any;
+                    const comment = target.comment.value;
+                    const visitDate = target.visitDate.value;
+                    const files = target.images.files ? Array.from(target.images.files) as File[] : [];
+
+                    setError("");
+                    try {
+                      const updated = await tourService.addReview(openTour.id, {
+                        rating: userRating, comment, visitDate, images: files
+                      });
+                      setTours(tours.map(t => t.id === updated.id ? updated : t));
+                      target.reset(); 
+                      setUserRating(5);
+                    } catch (err) {
+                      setError(getTourApiErrorMessage(err, "Failed to add review"));
+                    }
+                  }}
+                  className="mt-4 space-y-4"
+                >
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-medium uppercase text-text-muted">Rating</label>
+                    
+                       <div className="mt-2 flex gap-1">
+            {[1, 2, 3, 4, 5].map((num) => (
+              <button
+                key={num}
+                type="button"
+                onClick={() => setUserRating(num)}
+                className="text-2xl transition-transform hover:scale-110"
+              >
+                <span className={num <= userRating ? "text-yellow-500" : "text-gray-300"}>
+                  ★
+                </span>
+              </button>
+            ))}
+            <span className="ml-2 text-sm text-text-muted self-center">({userRating}/5)</span>
+          </div>
+        </div>
+                    <div>
+                      <label className="block text-xs font-medium uppercase text-text-muted">Visit Date</label>
+                      <input type="date" name="visitDate" required className="mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium uppercase text-text-muted">Comment</label>
+                    <textarea name="comment" required minLength={2} className="mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none min-h-[80px]" placeholder="How was your experience?" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium uppercase text-text-muted">Images</label>
+                    <input type="file" name="images" multiple accept="image/*" className="mt-1 block w-full text-xs text-text-secondary file:mr-3 file:rounded-md file:border file:bg-surface file:px-3 file:py-1.5 file:font-medium" />
+                  </div>
+                  <button type="submit" className="rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary-hover">
+                    Submit Review
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Lista recenzija */}
+            <div className="mt-8 space-y-6">
+              {openTour.reviews.length === 0 ? (
+                <p className="text-sm text-text-secondary italic">No reviews yet. Be the first to review this tour!</p>
+              ) : (
+                openTour.reviews.map((rev) => (
+                  <div key={rev.id} className="border-b pb-6 last:border-0">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-text-primary">@{rev.touristUsername}</span>
+                        <span className="flex text-yellow-500">
+                          {"★".repeat(rev.rating)}{"☆".repeat(5 - rev.rating)}
+                        </span>
+                      </div>
+                      <span className="text-xs text-text-muted">{formatDate(rev.commentDate)}</span>
+                    </div>
+                    <p className="mt-2 text-sm text-text-secondary">{rev.comment}</p>
+                    <div className="mt-1 text-[11px] text-text-muted">Visited on: {new Date(rev.visitDate).toLocaleDateString()}</div>
+                    
+                    {rev.images && rev.images.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {rev.images.map((img, idx) => (
+                          <a key={idx} href={resolveTourAssetUrl(img)} target="_blank" rel="noreferrer">
+                            <img 
+                              src={resolveTourAssetUrl(img)} 
+                              alt="Review" 
+                              className="h-20 w-20 rounded-md border object-cover hover:opacity-80 transition-opacity" 
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           </section>
         </article>
       </div>

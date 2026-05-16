@@ -88,4 +88,17 @@ public class ToursController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+    [HttpPost("{id}/reviews")]
+[RequestSizeLimit(20 * 1024 * 1024)] //20MB limit zbog vise slika
+public async Task<ActionResult<TourResponse>> AddReview(string id, [FromForm] AddReviewRequest request, CancellationToken cancellationToken)
+{
+    var user = await _authService.RequireAuthenticatedAsync(Request, cancellationToken);
+    if (user is null)
+    {
+        return Unauthorized(new { error = "Only authenticated tourists can leave reviews." });
+    }
+
+    var tour = await _tourService.AddReviewAsync(id, request, user.Username, cancellationToken);
+    return tour is null ? NotFound(new { error = "Tour not found." }) : tour;
+}
 }

@@ -27,6 +27,8 @@ public class Tour
 
     public List<KeyPoint> KeyPoints { get; set; } = [];
 
+    public List<Review> Reviews { get; set; } = []; 
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
