@@ -66,9 +66,16 @@ const Navbar: React.FC = () => {
                   (user?.role === "GUIDE" ? (
                     <ToursNavDropdown variant="desktop" />
                   ) : (
+
+                    <>
+
                     <NavLink to="/tours" className={navLinkClass}>
                       Tours
                     </NavLink>
+                     <NavLink to="/simulator" className={navLinkClass}>
+        Simulator
+      </NavLink>
+      </>
                   ))}
               </>
             )}
@@ -152,9 +159,14 @@ const Navbar: React.FC = () => {
                 (user?.role === "GUIDE" ? (
                   <ToursNavDropdown variant="mobile" />
                 ) : (
+                  <>
                   <NavLink to="/tours" className={navLinkClass}>
                     Tours
                   </NavLink>
+                  <NavLink to="/simulator" className={navLinkClass}>
+                     Simulator
+                  </NavLink>
+                  </>
                 ))}
             </>
           )}

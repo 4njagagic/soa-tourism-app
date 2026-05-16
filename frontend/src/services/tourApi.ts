@@ -18,6 +18,12 @@ export const getTourApiErrorMessage = (err: unknown, fallback: string) => {
 
   return fallback;
 };
+export interface UserPosition {
+  username: string;
+  latitude: number;
+  longitude: number;
+  updatedAt: string;
+}
 
 export interface KeyPoint {
   id: string;
@@ -163,6 +169,18 @@ export const tourService = {
 
   deleteKeyPoint: async (tourId: string, pointId: string): Promise<Tour> => {
     const res = await tourClient.delete(`/tours/${tourId}/key-points/${pointId}`);
+    return res.data;
+  },
+  getMyPosition: async (): Promise<UserPosition> => {
+    const res = await tourClient.get("/user-positions/my");
+    return res.data;
+  },
+
+  updateMyPosition: async (lat: number, lng: number): Promise<UserPosition> => {
+    const res = await tourClient.post("/user-positions/my", {
+      latitude: lat,
+      longitude: lng,
+    });
     return res.data;
   },
 };

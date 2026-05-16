@@ -17,6 +17,7 @@ import AddKeyPoint from "./pages/AddKeyPoint";
 import Navbar from "./components/Navbar";
 import AdminUsers from "./pages/AdminUsers";
 import EditKeyPoint from "./pages/EditKeyPoint";
+import Simulator from "./pages/Simulator";
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -107,6 +108,14 @@ function AppContent() {
     </PrivateRoute>
   }
 />
+            <Route
+              path="/simulator"
+              element={
+                <PrivateRoute>
+                  <Simulator />
+                </PrivateRoute>
+              }
+            />
           </Routes>
         </main>
       </div>
