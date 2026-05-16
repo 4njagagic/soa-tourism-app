@@ -29,6 +29,16 @@ export interface KeyPoint {
   createdAt: string;
 }
 
+export interface Review {
+  id: string;
+  rating: number;
+  comment: string;
+  touristUsername: string;
+  visitDate: string;
+  commentDate: string;
+  images: string[];
+}
+
 export interface Tour {
   id: string;
   name: string;
@@ -41,6 +51,7 @@ export interface Tour {
   keyPoints: KeyPoint[];
   createdAt: string;
   updatedAt: string;
+  reviews: Review[];
 }
 
 export interface CreateTourRequest {
@@ -101,6 +112,28 @@ export const tourService = {
     form.append("image", data.image);
 
     const res = await tourClient.post(`/tours/${tourId}/key-points`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+  },
+  addReview: async (
+    tourId: string,
+    data: {
+      rating: number;
+      comment: string;
+      visitDate: string;
+      images?: File[];
+    }
+  ): Promise<Tour> => {
+    const form = new FormData();
+    form.append("rating", String(data.rating));
+    form.append("comment", data.comment);
+    form.append("visitDate", data.visitDate);
+    if (data.images) {
+      data.images.forEach((img) => form.append("images", img));
+    }
+
+    const res = await tourClient.post(`/tours/${tourId}/reviews`, form, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return res.data;
