@@ -154,4 +154,39 @@ public class TourManagementService : ITourService
     var updated = await _repository.AddReviewAsync(tourId, review, cancellationToken);
     return updated is null ? null : TourResponse.FromTour(updated);
 }
+
+public async Task<TourResponse?> UpdateKeyPointAsync(string tourId, string pointId, UpdateKeyPointRequest request, string authorUsername, CancellationToken cancellationToken)
+{
+    var tour = await _repository.GetByIdAndAuthorAsync(tourId, authorUsername, cancellationToken);
+    if (tour == null) return null;
+
+    var existingPoint = tour.KeyPoints.FirstOrDefault(kp => kp.Id == pointId);
+    if (existingPoint == null) throw new InvalidOperationException("Key point not found.");
+
+    string imageUrl = existingPoint.ImageUrl;
+    if (request.Image != null && request.Image.Length > 0)
+    {
+        imageUrl = await SaveImageAsync(request.Image, cancellationToken);
+    }
+
+    var updatedPoint = new KeyPoint
+    {
+        Id = pointId,
+        Name = request.Name.Trim(),
+        Description = request.Description.Trim(),
+        Latitude = request.Latitude,
+        Longitude = request.Longitude,
+        ImageUrl = imageUrl,
+        CreatedAt = existingPoint.CreatedAt
+    };
+
+    var result = await _repository.UpdateKeyPointAsync(tourId, authorUsername, updatedPoint, cancellationToken);
+    return result == null ? null : TourResponse.FromTour(result);
+}
+
+public async Task<TourResponse?> DeleteKeyPointAsync(string tourId, string pointId, string authorUsername, CancellationToken cancellationToken)
+{
+    var result = await _repository.DeleteKeyPointAsync(tourId, authorUsername, pointId, cancellationToken);
+    return result == null ? null : TourResponse.FromTour(result);
+}
 }
