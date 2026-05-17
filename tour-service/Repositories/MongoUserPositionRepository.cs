@@ -24,6 +24,12 @@ public class MongoUserPositionRepository : IUserPositionRepository
     public async Task UpsertAsync(UserPosition position, CancellationToken cancellationToken)
     {
         var filter = Builders<UserPosition>.Filter.Eq(p => p.Username, position.Username);
-        await _positions.ReplaceOneAsync(filter, position, new ReplaceOptions { IsUpsert = true }, cancellationToken);
+        var update = Builders<UserPosition>.Update
+            .Set(p => p.Username, position.Username)
+            .Set(p => p.Latitude, position.Latitude)
+            .Set(p => p.Longitude, position.Longitude)
+            .Set(p => p.UpdatedAt, position.UpdatedAt);
+
+        await _positions.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true }, cancellationToken);
     }
 }

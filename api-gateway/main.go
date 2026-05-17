@@ -73,11 +73,13 @@ func main() {
 	})
 
 	// Blog service: uploads and /api/blogs
+	mux.Handle("/blog-api/uploads/", http.StripPrefix("/blog-api", proxyTo(blog)))
 	mux.Handle("/uploads/", proxyTo(blog))
 	mux.Handle("/api/blogs", proxyTo(blog))
 	mux.Handle("/api/blogs/", proxyTo(blog))
 
 	// Tour service
+	mux.Handle("/tour-api/uploads/", http.StripPrefix("/tour-api", proxyTo(tour)))
 	mux.Handle("/api/tours", proxyTo(tour))
 	mux.Handle("/api/tours/", proxyTo(tour))
 	mux.Handle("/api/user-positions", proxyTo(tour))
