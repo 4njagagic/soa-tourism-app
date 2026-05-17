@@ -149,6 +149,29 @@ services:
       - soa-network
     restart: unless-stopped
 
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    environment:
+      GATEWAY_ADDRESS: :8000
+      BLOG_SERVICE_URL: http://blog-service:${BLOG_SERVICE_PORT}
+      TOUR_SERVICE_URL: http://tour-service:${TOUR_SERVICE_PORT}
+      STAKEHOLDERS_SERVICE_URL: http://stakeholders-service:${STAKEHOLDERS_SERVICE_PORT}
+      FRONTEND_URL: http://frontend:${FRONTEND_CONTAINER_PORT}
+      CORS_ALLOW_ORIGIN: "*"
+    ports:
+      - "${GATEWAY_HOST_PORT:-8000}:${GATEWAY_CONTAINER_PORT:-8000}"
+    depends_on:
+      - stakeholders-service
+      - blog-service
+      - tour-service
+      - frontend
+    networks:
+      - soa-network
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   blog-postgres-data:
