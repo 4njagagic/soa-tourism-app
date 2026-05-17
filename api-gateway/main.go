@@ -80,6 +80,8 @@ func main() {
 	// Tour service
 	mux.Handle("/api/tours", proxyTo(tour))
 	mux.Handle("/api/tours/", proxyTo(tour))
+	mux.Handle("/api/user-positions", proxyTo(tour))
+	mux.Handle("/api/user-positions/", proxyTo(tour))
 
 	// Stakeholders service (users, auth)
 	mux.Handle("/api/stakeholders", proxyTo(stakeholders))
