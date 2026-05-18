@@ -96,9 +96,32 @@ public class UserService {
     return userRepository.findAll()
             .stream()
             .filter(user -> user.getRole() != UserRole.ADMIN) 
+            .filter(User::getEnabled)
             .map(this::mapToProfileDto)
             .collect(Collectors.toList());
     }
+
+        public List<UserProfileDto> searchUsers(String query) {
+        String normalized = query == null ? "" : query.trim().toLowerCase();
+        if (normalized.isEmpty()) {
+            return List.of();
+        }
+
+        return userRepository.findAll()
+            .stream()
+            .filter(user -> user.getRole() != UserRole.ADMIN)
+            .filter(User::getEnabled)
+            .filter(user -> {
+                String username = user.getUsername() == null ? "" : user.getUsername().toLowerCase();
+                String firstName = user.getFirstName() == null ? "" : user.getFirstName().toLowerCase();
+                String lastName = user.getLastName() == null ? "" : user.getLastName().toLowerCase();
+                return username.contains(normalized)
+                    || firstName.contains(normalized)
+                    || lastName.contains(normalized);
+            })
+            .map(this::mapToProfileDto)
+            .collect(Collectors.toList());
+        }
     @Transactional
     public void blockUser(Long userId) {
         User user = userRepository.findById(userId)

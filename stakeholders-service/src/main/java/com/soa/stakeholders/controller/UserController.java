@@ -44,6 +44,11 @@ public class UserController {
         }
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<List<UserProfileDto>> searchUsers(@RequestParam String query) {
+        return ResponseEntity.ok(userService.searchUsers(query));
+    }
+
     /**
      * Ažuriranje sopstvenog profila
      */
