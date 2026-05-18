@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -49,6 +49,7 @@ function AppContent() {
                 />
               }
             />
+            <Route path="/" element={<Navigate to={user?.role === 'ADMIN' ? "/admin-users" : "/blogs"} replace />} />
             <Route path="/blogs" element={<Blogs />} />
             <Route
               path="/blogs/new"
@@ -132,3 +133,5 @@ function App() {
 }
 
 export default App;
+
+

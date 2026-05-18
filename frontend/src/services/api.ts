@@ -84,6 +84,11 @@ export const userService = {
     return response.data;
   },
 
+  searchUsers: async (query: string): Promise<User[]> => {
+    const response = await client.get('/users/search', { params: { query } });
+    return response.data;
+  },
+
   blockUser: async (userId: number): Promise<void> => {
     await client.patch(`/users/${userId}/block`);
   },

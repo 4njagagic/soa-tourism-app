@@ -1,6 +1,7 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
 import { userService } from "../services/api";
+import { followerApi } from "../services/followerApi";
 
 interface ProfileData {
   firstName?: string;
@@ -28,12 +29,28 @@ const Profile: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [followers, setFollowers] = useState<string[]>([]);
+  const [following, setFollowing] = useState<string[]>([]);
+  const [followLoading, setFollowLoading] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
       fetchProfile();
+      loadFollows();
     }
   }, [user?.id]);
+
+  const loadFollows = async () => {
+    if (!user?.username) return;
+    try {
+      const f = await followerApi.getFollowed();
+      const fo = await followerApi.getFollowers();
+      setFollowing(f || []);
+      setFollowers(fo || []);
+    } catch (e) {
+      console.error("Failed to load follower data", e);
+    }
+  };
 
   const fetchProfile = async () => {
     if (!user?.id) return;
@@ -86,10 +103,40 @@ const Profile: React.FC = () => {
       setMessage("Profile updated successfully!");
       setIsEditing(false);
       setTimeout(() => setMessage(""), 3000);
+      // refresh follower lists in case username changed
+      await loadFollows();
     } catch (error: any) {
       setMessage(error.response?.data?.message || "Failed to update profile");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFollowToggle = async (target: string) => {
+    if (!user) return;
+    setFollowLoading(true);
+    try {
+      const isFollowing = following.includes(target);
+      // optimistic UI update
+      if (isFollowing) {
+        setFollowing((prev) => prev.filter((u) => u !== target));
+      } else {
+        setFollowing((prev) => [...prev, target]);
+      }
+
+      if (isFollowing) {
+        await followerApi.unfollow(target);
+      } else {
+        await followerApi.follow(target);
+      }
+      // refresh lists from server to ensure consistency
+      await loadFollows();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("Failed to toggle follow", e);
+      setMessage("Failed to update follow state. Check console for details.");
+    } finally {
+      setFollowLoading(false);
     }
   };
 
@@ -331,6 +378,47 @@ const Profile: React.FC = () => {
                 </div>
               </form>
             )}
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-lg border bg-surface p-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold">Following</div>
+                  <div className="text-xs text-text-muted">People you follow</div>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {following.length === 0 ? (
+                    <div className="text-sm text-text-secondary">You are not following anyone yet.</div>
+                  ) : (
+                    following.map((u) => (
+                      <div key={u} className="flex items-center justify-between">
+                        <div className="text-sm">@{u}</div>
+                        <button type="button" onClick={() => handleFollowToggle(u)} className="rounded-md border bg-surface px-3 py-1 text-xs text-error hover:bg-muted" disabled={followLoading}>Unfollow</button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-surface p-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold">Followers</div>
+                  <div className="text-xs text-text-muted">People following you</div>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {followers.length === 0 ? (
+                    <div className="text-sm text-text-secondary">No one follows you yet.</div>
+                  ) : (
+                    followers.map((u) => (
+                      <div key={u} className="flex items-center justify-between">
+                        <div className="text-sm">@{u}</div>
+                        <button type="button" onClick={() => handleFollowToggle(u)} className="rounded-md px-3 py-1 text-xs bg-primary text-white hover:bg-primary-hover" disabled={followLoading}>
+                          {following.includes(u) ? "Unfollow" : "Follow"}
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
