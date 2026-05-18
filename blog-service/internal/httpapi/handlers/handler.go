@@ -177,8 +177,19 @@ func extFromContentType(ct string) string {
 }
 
 func (h *Handler) ListBlogs(w http.ResponseWriter, r *http.Request) {
-	_ = r
-	blogs, err := h.Blogs.ListBlogs(r.Context())
+	var blogs []domain.Blog
+	var err error
+
+	// Check if user is authenticated
+	username, ok := middleware.UsernameFromContext(r.Context())
+	if ok && username != "" {
+		// Return only blogs from followed users
+		blogs, err = h.Blogs.ListBlogsByFollowed(r.Context(), username)
+	} else {
+		// Return empty list for unauthenticated users
+		blogs = []domain.Blog{}
+	}
+
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal error"})
 		return

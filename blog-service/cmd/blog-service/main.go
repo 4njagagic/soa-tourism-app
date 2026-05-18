@@ -37,7 +37,8 @@ func main() {
 	commentRepo := postgres.NewCommentRepository(db)
 	likeRepo := postgres.NewLikeRepository(db)
 
-	blogSvc := service.NewBlogService(blogRepo)
+	followerClient := service.NewFollowerClient(cfg.FollowerServiceURL)
+	blogSvc := service.NewBlogServiceWithFollowers(blogRepo, followerClient)
 	commentSvc := service.NewCommentService(commentRepo)
 	likeSvc := service.NewLikeService(likeRepo)
 

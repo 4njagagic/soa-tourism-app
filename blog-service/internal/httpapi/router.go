@@ -21,7 +21,7 @@ func NewRouter(cfg config.Config, h *handlers.Handler) http.Handler {
 
 	// Blogs
 	mux.HandleFunc("POST /api/blogs", middleware.RequireAuth(cfg, h.CreateBlog))
-	mux.HandleFunc("GET /api/blogs", h.ListBlogs)
+	mux.HandleFunc("GET /api/blogs", middleware.OptionalAuth(cfg, h.ListBlogs))
 	mux.HandleFunc("GET /api/blogs/{id}", h.GetBlog)
 
 	// Likes
