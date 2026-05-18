@@ -61,6 +61,7 @@ func main() {
 	blog := getEnv("BLOG_SERVICE_URL", "http://blog-service:"+getEnv("BLOG_SERVICE_PORT", "8081"))
 	tour := getEnv("TOUR_SERVICE_URL", "http://tour-service:"+getEnv("TOUR_SERVICE_PORT", "8083"))
 	stakeholders := getEnv("STAKEHOLDERS_SERVICE_URL", "http://stakeholders-service:"+getEnv("STAKEHOLDERS_SERVICE_PORT", "8080"))
+	follower := getEnv("FOLLOWER_SERVICE_URL", "http://follower-service:"+getEnv("FOLLOWER_SERVICE_PORT", "8082"))
 	frontend := getEnv("FRONTEND_URL", "http://frontend:"+getEnv("FRONTEND_CONTAINER_PORT", "80"))
 	addr := getEnv("GATEWAY_ADDRESS", ":8000")
 
@@ -92,6 +93,10 @@ func main() {
 	mux.Handle("/api/auth/", proxyTo(stakeholders))
 	mux.Handle("/api/users", proxyTo(stakeholders))
 	mux.Handle("/api/users/", proxyTo(stakeholders))
+
+	// Followers service
+	mux.Handle("/followers", proxyTo(follower))
+	mux.Handle("/followers/", proxyTo(follower))
 
 	// Fallback: static frontend (serve SPA)
 	mux.Handle("/", proxyTo(frontend))

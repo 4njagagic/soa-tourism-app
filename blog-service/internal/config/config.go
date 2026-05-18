@@ -18,6 +18,8 @@ type Config struct {
 	DBName     string
 	DBUser     string
 	DBPassword string
+
+	FollowerServiceURL string
 }
 
 func FromEnv() Config {
@@ -34,6 +36,8 @@ func FromEnv() Config {
 		DBName:     env("DB_NAME", "blog_db"),
 		DBUser:     env("DB_USER", "blog_user"),
 		DBPassword: env("DB_PASSWORD", "blog_pass"),
+
+		FollowerServiceURL: env("FOLLOWER_SERVICE_URL", "http://localhost:8083/followers"),
 	}
 }
 

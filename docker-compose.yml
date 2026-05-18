@@ -93,6 +93,7 @@ services:
       DB_USER: ${BLOG_DB_USER}
       DB_PASSWORD: ${BLOG_DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
+      FOLLOWER_SERVICE_URL: http://follower-service:8082/followers
     ports:
       - "${BLOG_SERVICE_PORT}:${BLOG_SERVICE_PORT}"
     user: "0:0"
@@ -128,6 +129,44 @@ services:
         condition: service_started
     networks:
       - soa-network
+  neo4j:
+    image: neo4j:4.4-community
+    container_name: neo4j-db
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
+      NEO4J_apoc_export_file_enabled: "true"
+      NEO4J_apoc_import_file_enabled: "true"
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j-data:/var/lib/neo4j/data
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:7474"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  follower-service:
+    build:
+      context: ./follower-service
+      dockerfile: Dockerfile
+    container_name: follower-service
+    environment:
+      SPRING_NEO4J_URI: bolt://neo4j:7687
+      SPRING_NEO4J_AUTHENTICATION_USERNAME: neo4j
+      SPRING_NEO4J_AUTHENTICATION_PASSWORD: ${NEO4J_PASSWORD}
+      SERVER_PORT: 8082
+    ports:
+      - "${FOLLOWER_SERVICE_PORT}:8082"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    networks:
+      - soa-network
     restart: unless-stopped
 
   frontend:
@@ -138,6 +177,7 @@ services:
         VITE_API_URL: ${VITE_API_URL}
         VITE_BLOG_API_URL: ${VITE_BLOG_API_URL}
         VITE_TOUR_API_URL: ${VITE_TOUR_API_URL}
+        VITE_FOLLOWER_URL: ${VITE_FOLLOWER_URL}
     container_name: soa-tourism-frontend
     ports:
       - "${FRONTEND_HOST_PORT}:${FRONTEND_CONTAINER_PORT}"
@@ -145,6 +185,7 @@ services:
       - stakeholders-service
       - blog-service
       - tour-service
+      - follower-service
     networks:
       - soa-network
     restart: unless-stopped
@@ -178,6 +219,7 @@ volumes:
   blog-uploads-data:
   mongo-data:
   tour-uploads-data:
+  neo4j-data:
 
 networks:
   soa-network:

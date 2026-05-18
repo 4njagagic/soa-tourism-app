@@ -32,3 +32,16 @@ func RequireAuth(cfg config.Config, next http.HandlerFunc) http.HandlerFunc {
 		next(w, r.WithContext(ctx))
 	}
 }
+
+// OptionalAuth extracts auth if present, but doesn't require it
+func OptionalAuth(cfg config.Config, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		username, _ := auth.UsernameFromAuthorizationHeader(r.Header.Get("Authorization"), cfg.JWTSecret)
+		if username != "" {
+			ctx := context.WithValue(r.Context(), usernameKey, username)
+			next(w, r.WithContext(ctx))
+		} else {
+			next(w, r)
+		}
+	}
+}
