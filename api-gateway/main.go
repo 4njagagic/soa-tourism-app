@@ -1,13 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -33,6 +36,129 @@ func proxyTo(target string) http.Handler {
 		req.Host = targetURL.Host
 	}
 	return proxy
+}
+
+type jsonRPCRequest struct {
+	JSONRPC string      `json:"jsonrpc"`
+	Method  string      `json:"method"`
+	Params  interface{} `json:"params,omitempty"`
+	ID      int         `json:"id"`
+}
+
+type jsonRPCResponse struct {
+	JSONRPC string          `json:"jsonrpc"`
+	Result  json.RawMessage `json:"result,omitempty"`
+	Error   *jsonRPCError   `json:"error,omitempty"`
+	ID      int             `json:"id"`
+}
+
+type jsonRPCError struct {
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
+}
+
+func jsonRPCCall(ctx context.Context, url, method string, params interface{}, authorization string) (*json.RawMessage, *jsonRPCError, error) {
+	payload := jsonRPCRequest{
+		JSONRPC: "2.0",
+		Method:  method,
+		Params:  params,
+		ID:      1,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url+"/rpc", bytes.NewReader(body))
+	if err != nil {
+		return nil, nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if authorization != "" {
+		req.Header.Set("Authorization", authorization)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	var rpcResp jsonRPCResponse
+	if err := json.NewDecoder(resp.Body).Decode(&rpcResp); err != nil {
+		return nil, nil, err
+	}
+
+	if rpcResp.Error != nil {
+		return nil, rpcResp.Error, nil
+	}
+
+	return &rpcResp.Result, nil, nil
+}
+
+func handleTourRPC(target string, proxy http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/tours/")
+		if r.Method == http.MethodPost && strings.HasSuffix(path, "/publish") {
+			tourID := strings.TrimSuffix(path, "/publish")
+			tourID = strings.TrimSuffix(tourID, "/")
+			if tourID == "" {
+				proxy.ServeHTTP(w, r)
+				return
+			}
+
+			result, rpcErr, err := jsonRPCCall(r.Context(), target, "PublishTour", map[string]interface{}{"id": tourID}, r.Header.Get("Authorization"))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadGateway)
+				return
+			}
+			if rpcErr != nil {
+				status := rpcErr.Code
+				if status < 100 || status >= 600 {
+					status = http.StatusBadRequest
+				}
+				http.Error(w, rpcErr.Message, status)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(*result)
+			return
+		}
+
+		if r.Method == http.MethodPost && strings.HasSuffix(path, "/archive") {
+			tourID := strings.TrimSuffix(path, "/archive")
+			tourID = strings.TrimSuffix(tourID, "/")
+			if tourID == "" {
+				proxy.ServeHTTP(w, r)
+				return
+			}
+
+			result, rpcErr, err := jsonRPCCall(r.Context(), target, "ArchiveTour", map[string]interface{}{"id": tourID}, r.Header.Get("Authorization"))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadGateway)
+				return
+			}
+			if rpcErr != nil {
+				status := rpcErr.Code
+				if status < 100 || status >= 600 {
+					status = http.StatusBadRequest
+				}
+				http.Error(w, rpcErr.Message, status)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(*result)
+			return
+		}
+
+		proxy.ServeHTTP(w, r)
+	}
 }
 
 func loggingMiddleware(next http.Handler) http.Handler {
@@ -81,10 +207,11 @@ func main() {
 
 	// Tour service
 	mux.Handle("/tour-api/uploads/", http.StripPrefix("/tour-api", proxyTo(tour)))
-	mux.Handle("/api/tours", proxyTo(tour))
-	mux.Handle("/api/tours/", proxyTo(tour))
-	mux.Handle("/api/user-positions", proxyTo(tour))
-	mux.Handle("/api/user-positions/", proxyTo(tour))
+	tourProxy := proxyTo(tour)
+	mux.Handle("/api/tours", handleTourRPC(tour, tourProxy))
+	mux.Handle("/api/tours/", handleTourRPC(tour, tourProxy))
+	mux.Handle("/api/user-positions", tourProxy)
+	mux.Handle("/api/user-positions/", tourProxy)
 
 	// Stakeholders service (users, auth)
 	mux.Handle("/api/stakeholders", proxyTo(stakeholders))

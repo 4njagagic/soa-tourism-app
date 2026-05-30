@@ -31,6 +31,8 @@ export interface KeyPoint {
   description: string;
   latitude: number;
   longitude: number;
+  order: number;
+  distanceFromPreviousKm: number;
   imageUrl: string;
   createdAt: string;
 }
@@ -45,19 +47,28 @@ export interface Review {
   images: string[];
 }
 
+export interface TransportTime {
+  type: "Walking" | "Bicycle" | "Car";
+  durationMinutes: number;
+}
+
 export interface Tour {
   id: string;
   name: string;
   description: string;
   difficulty: string;
   tags: string[];
-  status: "Draft";
+  status: "Draft" | "Published" | "Archived";
   price: number;
   authorUsername: string;
   keyPoints: KeyPoint[];
+  totalDistanceKm: number;
   createdAt: string;
   updatedAt: string;
+  publishedAt: string;
+  archivedAt: string;
   reviews: Review[];
+  transportTimes: TransportTime[]
 }
 
 export interface CreateTourRequest {
@@ -183,6 +194,31 @@ export const tourService = {
     });
     return res.data;
   },
+    addTransportTime: async (
+    tourId: string,
+    data: { 
+      type: 'Walking' | 'Bicycle' | 'Car'; 
+      durationMinutes: number 
+    }
+  ): Promise<Tour> => {
+    const res = await tourClient.post(`/tours/${tourId}/transport-times`, data);
+    return res.data;
+  },
+
+  publishTour: async (tourId: string): Promise<Tour> => {
+    const res = await tourClient.post(`/tours/${tourId}/publish`);
+    return res.data;
+  },
+
+  archiveTour: async (tourId: string): Promise<Tour> => {
+    const res = await tourClient.post(`/tours/${tourId}/archive`);
+    return res.data;
+  },
+
+  reactivateTour: async (tourId: string): Promise<Tour> => {
+    const res = await tourClient.post(`/tours/${tourId}/reactivate`);
+    return res.data;
+  }
 };
 
 export default tourClient;

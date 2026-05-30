@@ -36,7 +36,7 @@ public class AuthService : IAuthService
             return null;
         }
 
-        return new AuthenticatedAuthor(username);
+        return new AuthenticatedAuthor(username, profile.Role);
     }
 
     public async Task<AuthenticatedAuthor?> RequireAuthenticatedAsync(HttpRequest request, CancellationToken cancellationToken)
@@ -59,7 +59,7 @@ public class AuthService : IAuthService
             return null;
         }
 
-        return new AuthenticatedAuthor(username);
+        return new AuthenticatedAuthor(username, profile.Role);
     }
 
     private static string? ExtractBearerToken(HttpRequest request)

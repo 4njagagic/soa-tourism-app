@@ -112,4 +112,15 @@ public async Task<Tour?> DeleteKeyPointAsync(string id, string authorUsername, s
 
     return await _tours.FindOneAndUpdateAsync(filter, update, new FindOneAndUpdateOptions<Tour> { ReturnDocument = ReturnDocument.After }, cancellationToken);
 }
+
+    public async Task<Tour?> UpdateAsync(Tour tour, CancellationToken cancellationToken)
+    {
+        var result = await _tours.ReplaceOneAsync(
+            t => t.Id == tour.Id,
+            tour,
+            new ReplaceOptions { IsUpsert = false },
+            cancellationToken);
+
+        return result.IsAcknowledged ? tour : null;
+    }
 }
