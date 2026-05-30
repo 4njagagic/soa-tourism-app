@@ -27,6 +27,15 @@ public class Tour
 
     public List<KeyPoint> KeyPoints { get; set; } = [];
 
+    public List<TransportTime> TransportTimes { get; set; } = [];
+
+    [BsonRepresentation(BsonType.Decimal128)]
+    public decimal TotalDistanceKm { get; set; } = 0;
+
+    public DateTime? PublishedAt { get; set; }
+
+    public DateTime? ArchivedAt { get; set; }
+
     public List<Review> Reviews { get; set; } = []; 
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
