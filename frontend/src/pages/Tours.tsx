@@ -95,10 +95,32 @@ const Tours: React.FC = () => {
   const [userRating, setUserRating] = useState(5);
   const [showMap, setShowMap] = useState(false);
   const [routeCoords, setRouteCoords] = useState<[number, number][]>([]);
+  const [transportType, setTransportType] = useState<"Walking" | "Bicycle" | "Car">("Walking");
+  const [durationMinutes, setDurationMinutes] = useState(60);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const openTour = useMemo(
     () => tours.find((tour) => tour.id === openTourId) || null,
     [openTourId, tours],
+  );
+
+  const canPublishTour = useMemo(() => {
+    if (!openTour) return false;
+    return (
+      openTour.status === "Published" ? false :
+      openTour.status === "Draft" &&
+      openTour.name.trim().length > 0 &&
+      openTour.description.trim().length > 0 &&
+      openTour.difficulty.trim().length > 0 &&
+      openTour.tags.length > 0 &&
+      openTour.keyPoints.length >= 2 &&
+      (openTour.transportTimes?.length ?? 0) > 0
+    );
+  }, [openTour]);
+
+  const visibleKeyPoints = useMemo(
+    () => (openTour && isTourist ? openTour.keyPoints.slice(0, 1) : openTour?.keyPoints ?? []),
+    [openTour, isTourist],
   );
 
   const loadTours = async () => {
@@ -116,14 +138,56 @@ const Tours: React.FC = () => {
     }
   };
 
+  const publishTour = async () => {
+    if (!openTour) return;
+    setActionLoading(true);
+    setError("");
+    try {
+      const updated = await tourService.publishTour(openTour.id);
+      setTours((prev) => prev.map((tour) => (tour.id === updated.id ? updated : tour)));
+    } catch (err: unknown) {
+      setError(getTourApiErrorMessage(err, "Failed to publish tour"));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const archiveTour = async () => {
+    if (!openTour) return;
+    setActionLoading(true);
+    setError("");
+    try {
+      const updated = await tourService.archiveTour(openTour.id);
+      setTours((prev) => prev.map((tour) => (tour.id === updated.id ? updated : tour)));
+    } catch (err: unknown) {
+      setError(getTourApiErrorMessage(err, "Failed to archive tour"));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const reactivateTour = async () => {
+    if (!openTour) return;
+    setActionLoading(true);
+    setError("");
+    try {
+      const updated = await tourService.reactivateTour(openTour.id);
+      setTours((prev) => prev.map((tour) => (tour.id === updated.id ? updated : tour)));
+    } catch (err: unknown) {
+      setError(getTourApiErrorMessage(err, "Failed to reactivate tour"));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const fetchRoute = async () => {
-  if (!openTour || openTour.keyPoints.length < 2) {
-    setRouteCoords(openTour?.keyPoints.map(kp => [kp.latitude, kp.longitude] as [number, number]) || []);
+  if (!openTour || visibleKeyPoints.length < 2) {
+    setRouteCoords(visibleKeyPoints.map(kp => [kp.latitude, kp.longitude] as [number, number]));
     return;
   }
 
   try {
-    const query = openTour.keyPoints
+    const query = visibleKeyPoints
       .map((kp) => `${kp.longitude},${kp.latitude}`)
       .join(";");
 
@@ -223,7 +287,57 @@ useEffect(() => {
             <span>Price: {openTour.price}</span>
             <span>By @{openTour.authorUsername}</span>
             <span>Updated: {formatDate(openTour.updatedAt)}</span>
+            {openTour.publishedAt && (
+              <span>Published: {formatDate(openTour.publishedAt)}</span>
+            )}
+            {openTour.archivedAt && (
+              <span>Archived: {formatDate(openTour.archivedAt)}</span>
+            )}
+            {openTour.totalDistanceKm > 0 && (
+              <span>Total distance: {openTour.totalDistanceKm.toFixed(2)} km</span>
+            )}
           </div>
+
+          {isGuide && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {openTour.status === "Draft" && (
+                <button
+                  type="button"
+                  disabled={actionLoading || !canPublishTour}
+                  onClick={publishTour}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-60"
+                >
+                  {actionLoading ? "Publishing..." : "Publish tour"}
+                </button>
+              )}
+              {openTour.status === "Published" && (
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={archiveTour}
+                  className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:bg-error/90 disabled:opacity-60"
+                >
+                  {actionLoading ? "Archiving..." : "Archive tour"}
+                </button>
+              )}
+              {openTour.status === "Archived" && (
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={reactivateTour}
+                  className="rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary-hover disabled:opacity-60"
+                >
+                  {actionLoading ? "Reactivating..." : "Reactivate tour"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {isGuide && openTour.status === "Draft" && !canPublishTour && (
+            <div className="mt-3 rounded-lg bg-muted/50 px-4 py-3 text-sm text-text-secondary">
+              Tour must have at least two key points, one transport time, and tags before it can be published.
+            </div>
+          )}
 
           <h1 className="mt-3 text-2xl font-semibold leading-snug">
             {openTour.name}
@@ -246,32 +360,112 @@ useEffect(() => {
             ))}
           </div>
 
+          {isGuide && (
+            <section className="mt-6 rounded-xl border p-4">
+              <h2 className="mb-3 text-base font-semibold">
+                Add transport time
+              </h2>
+
+              <div className="flex flex-wrap gap-3">
+                <select
+                  value={transportType}
+                  onChange={(e) =>
+                    setTransportType(
+                      e.target.value as "Walking" | "Bicycle" | "Car"
+                    )
+                  }
+                  className="rounded-lg border px-3 py-2"
+                >
+                  <option value="Walking">Walking</option>
+                  <option value="Bicycle">Bicycle</option>
+                  <option value="Car">Car</option>
+                </select>
+
+                <input
+                  type="number"
+                  min={1}
+                  value={durationMinutes}
+                  onChange={(e) =>
+                    setDurationMinutes(Number(e.target.value))
+                  }
+                  className="rounded-lg border px-3 py-2"
+                  placeholder="Minutes"
+                />
+
+                <button
+                  type="button"
+                  className="rounded-lg bg-primary px-4 py-2 text-white"
+                  onClick={async () => {
+                    try {
+                      const updated = await tourService.addTransportTime(
+                        openTour.id,
+                        {
+                          type: transportType,
+                          durationMinutes,
+                        }
+                      );
+
+                      setTours(
+                        tours.map((t) =>
+                          t.id === updated.id ? updated : t
+                        )
+                      );
+                    } catch (err) {
+                      setError(
+                        getTourApiErrorMessage(
+                          err,
+                          "Failed to add transport time"
+                        )
+                      );
+                    }
+                  }}
+                >
+                  Add
+                </button>
+              </div>
+            </section>
+          )}
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {openTour.transportTimes?.map((t) => (
+            <div
+              key={`${t.type}-${t.durationMinutes}`}
+              className="rounded-full border border-gray-300 bg-gray-50 px-4 py-2 text-sm shadow-sm"
+            >
+              <span className="font-medium">{t.type}</span>
+              <span className="ml-2 text-gray-600">
+                {t.durationMinutes} min
+              </span>
+            </div>
+          ))}
+        </div>
+
           <section className="mt-6">
            <div className="flex items-center justify-between">
     <h2 className="text-base font-semibold">Key points</h2>
     <div className="flex gap-2">
-      {openTour.keyPoints.length > 0 && (
+      {visibleKeyPoints.length > 0 && (
         <button 
           onClick={() => setShowMap(!showMap)}
           className="text-xs font-medium text-primary hover:underline"
         >
-          {showMap ? "Hide Map" : "Show Route on Map"}
+          {showMap ? "Hide Map" : "Show route"}
         </button>
       )}
-      <div className="text-xs text-text-muted">{openTour.keyPoints.length} total</div>
+      <div className="text-xs text-text-muted">{visibleKeyPoints.length} visible</div>
     </div>
   </div>
 
   {/* MAPA SA LINIJAMA (POLYLINE) */}
-  {showMap && openTour.keyPoints.length > 0 && (
+  {showMap && visibleKeyPoints.length > 0 && (
     <div className="mt-4 h-[350px] w-full rounded-xl border overflow-hidden">
       <MapContainer 
-        center={[openTour.keyPoints[0].latitude, openTour.keyPoints[0].longitude]} 
+        center={[visibleKeyPoints[0].latitude, visibleKeyPoints[0].longitude]} 
         zoom={13} 
         className="h-full w-full"
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        {openTour.keyPoints.map((kp) => (
+        {visibleKeyPoints.map((kp) => (
           <Marker key={kp.id} position={[kp.latitude, kp.longitude]}>
             <Popup>{kp.name}</Popup>
           </Marker>
@@ -287,14 +481,18 @@ useEffect(() => {
   )}
 
   <div className="mt-3 space-y-2">
-    {openTour.keyPoints.map((point) => (
+    {visibleKeyPoints.map((point) => (
       <div key={point.id} className="group relative rounded-lg border bg-surface p-4 transition-colors hover:border-primary">
-        <div className="flex items-start justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <button onClick={() => setSelectedKeyPoint(point)} className="text-left">
             <h3 className="font-semibold text-text-primary">{point.name}</h3>
             <p className="mt-1 line-clamp-1 text-sm text-text-secondary">{point.description}</p>
           </button>
-          
+          <div className="text-xs text-text-muted">
+            {point.order === 1 ? "Start point" : `${point.distanceFromPreviousKm.toFixed(2)} km from previous`}
+          </div>
+        </div>
+        <div className="mt-3 flex items-start justify-between">
           <div className="flex gap-2">
             {isGuide && (
               <>
@@ -510,9 +708,9 @@ useEffect(() => {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="text-xs text-text-muted">
-                    {tour.status} · {tour.difficulty} · {tour.keyPoints.length}{" "}
-                    key points
+                    {tour.status} · {tour.difficulty} · {tour.keyPoints.length} visible
                     {!isGuide && ` · @${tour.authorUsername}`}
+                    {tour.totalDistanceKm > 0 && ` · ${tour.totalDistanceKm.toFixed(1)} km`}
                   </div>
                   <h2 className="mt-1 text-lg font-semibold leading-snug">
                     {tour.name}
