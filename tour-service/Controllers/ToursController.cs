@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using TourService.Auth;
 using TourService.DTOs;
+using TourService.Models;
 using TourService.Services;
 
 namespace TourService.Controllers;
@@ -32,7 +33,7 @@ public class ToursController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<TourResponse>>> GetAllTours(CancellationToken cancellationToken)
+    public async Task<ActionResult> GetAllTours(CancellationToken cancellationToken)
     {
         var user = await _authService.RequireAuthenticatedAsync(Request, cancellationToken);
         if (user is null)
@@ -40,7 +41,16 @@ public class ToursController : ControllerBase
             return Unauthorized(new { error = "Authentication required." });
         }
 
-        return await _tourService.GetAllToursAsync(cancellationToken);
+        var tours = await _tourService.GetAllToursAsync(cancellationToken);
+        if (string.Equals(user.Role, "TOURIST", StringComparison.OrdinalIgnoreCase))
+        {
+            return Ok(tours
+                .Where(t => t.Status == TourStatus.Published)
+                .Select(TourTouristResponse.FromResponse)
+                .ToList());
+        }
+
+        return Ok(tours);
     }
 
     [HttpGet("mine")]
@@ -56,7 +66,7 @@ public class ToursController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<TourResponse>> GetTour(string id, CancellationToken cancellationToken)
+    public async Task<ActionResult> GetTour(string id, CancellationToken cancellationToken)
     {
         var user = await _authService.RequireAuthenticatedAsync(Request, cancellationToken);
         if (user is null)
@@ -65,7 +75,22 @@ public class ToursController : ControllerBase
         }
 
         var tour = await _tourService.GetTourByIdAsync(id, cancellationToken);
-        return tour is null ? NotFound(new { error = "Tour not found." }) : tour;
+        if (tour is null)
+        {
+            return NotFound(new { error = "Tour not found." });
+        }
+
+        if (string.Equals(user.Role, "GUIDE", StringComparison.OrdinalIgnoreCase) && tour.AuthorUsername == user.Username)
+        {
+            return Ok(tour);
+        }
+
+        if (tour.Status == TourStatus.Published)
+        {
+            return Ok(TourTouristResponse.FromResponse(tour));
+        }
+
+        return NotFound(new { error = "Tour not found." });
     }
 
     [HttpPost("{id}/key-points")]
@@ -88,6 +113,87 @@ public class ToursController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+
+    [HttpPost("{id}/transport-times")]
+    public async Task<ActionResult<TourResponse>> AddTransportTime(string id, [FromBody] AddTransportTimeRequest request, CancellationToken cancellationToken)
+    {
+        var author = await _authService.RequireGuideAsync(Request, cancellationToken);
+        if (author is null)
+        {
+            return Unauthorized(new { error = "Only authenticated guides can manage tours." });
+        }
+
+        try
+        {
+            var tour = await _tourService.AddTransportTimeAsync(id, request, author.Username, cancellationToken);
+            return tour is null ? NotFound(new { error = "Tour not found." }) : tour;
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("{id}/publish")]
+    public async Task<ActionResult<TourResponse>> PublishTour(string id, CancellationToken cancellationToken)
+    {
+        var author = await _authService.RequireGuideAsync(Request, cancellationToken);
+        if (author is null)
+        {
+            return Unauthorized(new { error = "Only authenticated guides can publish tours." });
+        }
+
+        try
+        {
+            var tour = await _tourService.PublishTourAsync(id, author.Username, cancellationToken);
+            return tour is null ? NotFound(new { error = "Tour not found." }) : tour;
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("{id}/archive")]
+    public async Task<ActionResult<TourResponse>> ArchiveTour(string id, CancellationToken cancellationToken)
+    {
+        var author = await _authService.RequireGuideAsync(Request, cancellationToken);
+        if (author is null)
+        {
+            return Unauthorized(new { error = "Only authenticated guides can archive tours." });
+        }
+
+        try
+        {
+            var tour = await _tourService.ArchiveTourAsync(id, author.Username, cancellationToken);
+            return tour is null ? NotFound(new { error = "Tour not found." }) : tour;
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("{id}/reactivate")]
+    public async Task<ActionResult<TourResponse>> ReactivateTour(string id, CancellationToken cancellationToken)
+    {
+        var author = await _authService.RequireGuideAsync(Request, cancellationToken);
+        if (author is null)
+        {
+            return Unauthorized(new { error = "Only authenticated guides can reactivate tours." });
+        }
+
+        try
+        {
+            var tour = await _tourService.ReactivateTourAsync(id, author.Username, cancellationToken);
+            return tour is null ? NotFound(new { error = "Tour not found." }) : tour;
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     [HttpPost("{id}/reviews")]
 [RequestSizeLimit(20 * 1024 * 1024)] //20MB limit zbog vise slika
 public async Task<ActionResult<TourResponse>> AddReview(string id, [FromForm] AddReviewRequest request, CancellationToken cancellationToken)
