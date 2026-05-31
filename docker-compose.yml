@@ -37,6 +37,25 @@ services:
       timeout: 5s
       retries: 5
 
+  purchase-postgres:
+    image: postgres:15-alpine
+    container_name: purchase-db
+    environment:
+      POSTGRES_USER: ${PURCHASE_DB_USER}
+      POSTGRES_PASSWORD: ${PURCHASE_DB_PASSWORD}
+      POSTGRES_DB: ${PURCHASE_DB_NAME}
+    ports:
+      - "${PURCHASE_DB_HOST_PORT}:5432"
+    volumes:
+      - purchase-postgres-data:/var/lib/postgresql/data
+    networks:
+      - soa-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PURCHASE_DB_USER} -d ${PURCHASE_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   mongo:
     image: mongo:7
     container_name: tour-mongo
@@ -117,6 +136,7 @@ services:
       TOUR_MONGO_DB_NAME: ${TOUR_MONGO_DB_NAME:-tourism}
       JWT_SECRET: ${JWT_SECRET}
       STAKEHOLDERS_SERVICE_URL: http://stakeholders-service:${STAKEHOLDERS_SERVICE_PORT}/api
+      PURCHASE_SERVICE_URL: http://purchase-service:${PURCHASE_SERVICE_PORT}/api
       UPLOAD_DIR: /app/uploads
     ports:
       - "${TOUR_SERVICE_PORT:-8083}:${TOUR_SERVICE_PORT:-8083}"
@@ -168,6 +188,33 @@ services:
       - soa-network
     restart: unless-stopped
 
+  purchase-service:
+    build:
+      context: ./purchase-service
+      dockerfile: Dockerfile
+    container_name: purchase-service
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      TOUR_SERVICE_URL: http://tour-service:${TOUR_SERVICE_PORT}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://purchase-postgres:5432/${PURCHASE_DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${PURCHASE_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${PURCHASE_DB_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.PostgreSQLDialect
+      SERVER_PORT: ${PURCHASE_SERVICE_PORT}
+      GRPC_SERVER_PORT: ${PURCHASE_SERVICE_GRPC_PORT}
+    ports:
+      - "${PURCHASE_SERVICE_PORT}:${PURCHASE_SERVICE_PORT}"
+      - "${PURCHASE_SERVICE_GRPC_PORT}:${PURCHASE_SERVICE_GRPC_PORT}"
+    depends_on:
+      purchase-postgres:
+        condition: service_healthy
+      tour-service:
+        condition: service_started
+    networks:
+      - soa-network
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend
@@ -185,6 +232,7 @@ services:
       - blog-service
       - tour-service
       - follower-service
+      - purchase-service
     networks:
       - soa-network
     restart: unless-stopped
@@ -198,6 +246,8 @@ services:
       GATEWAY_ADDRESS: :8000
       BLOG_SERVICE_URL: http://blog-service:${BLOG_SERVICE_PORT}
       TOUR_SERVICE_URL: http://tour-service:${TOUR_SERVICE_PORT}
+      PURCHASE_SERVICE_URL: http://purchase-service:${PURCHASE_SERVICE_PORT}
+      PURCHASE_SERVICE_GRPC_ADDR: purchase-service:${PURCHASE_SERVICE_GRPC_PORT}
       STAKEHOLDERS_SERVICE_URL: http://stakeholders-service:${STAKEHOLDERS_SERVICE_PORT}
       FRONTEND_URL: http://frontend:${FRONTEND_CONTAINER_PORT}
       CORS_ALLOW_ORIGIN: "*"
@@ -207,6 +257,7 @@ services:
       - stakeholders-service
       - blog-service
       - tour-service
+      - purchase-service
       - frontend
     networks:
       - soa-network
@@ -215,6 +266,7 @@ services:
 volumes:
   postgres-data:
   blog-postgres-data:
+  purchase-postgres-data:
   blog-uploads-data:
   mongo-data:
   tour-uploads-data:

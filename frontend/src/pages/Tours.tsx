@@ -8,6 +8,10 @@ import {
   resolveTourAssetUrl,
   tourService,
 } from "../services/tourApi";
+import {
+  getPurchaseApiErrorMessage,
+  purchaseService,
+} from "../services/purchaseApi";
 import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
 
 type LocationState = { openTourId?: string };
@@ -98,6 +102,9 @@ const Tours: React.FC = () => {
   const [transportType, setTransportType] = useState<"Walking" | "Bicycle" | "Car">("Walking");
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [actionLoading, setActionLoading] = useState(false);
+  const [purchasedTourIds, setPurchasedTourIds] = useState<Set<string>>(new Set());
+  const [cartTourIds, setCartTourIds] = useState<Set<string>>(new Set());
+  const [cartActionLoading, setCartActionLoading] = useState(false);
 
   const openTour = useMemo(
     () => tours.find((tour) => tour.id === openTourId) || null,
@@ -118,10 +125,40 @@ const Tours: React.FC = () => {
     );
   }, [openTour]);
 
-  const visibleKeyPoints = useMemo(
-    () => (openTour && isTourist ? openTour.keyPoints.slice(0, 1) : openTour?.keyPoints ?? []),
-    [openTour, isTourist],
-  );
+  const visibleKeyPoints = useMemo(() => {
+    if (!openTour) return [];
+    if (isGuide) return openTour.keyPoints;
+    if (purchasedTourIds.has(openTour.id)) return openTour.keyPoints;
+    return openTour.keyPoints.slice(0, 1);
+  }, [openTour, isGuide, purchasedTourIds]);
+
+  const loadPurchaseState = async () => {
+    try {
+      const [purchases, cart] = await Promise.all([
+        purchaseService.getPurchases(),
+        purchaseService.getCart(),
+      ]);
+      setPurchasedTourIds(new Set(purchases.map((p) => p.tourId)));
+      setCartTourIds(new Set(cart.items.map((i) => i.tourId)));
+    } catch {
+      setPurchasedTourIds(new Set());
+      setCartTourIds(new Set());
+    }
+  };
+
+  const addToCart = async (tourId: string) => {
+    setCartActionLoading(true);
+    setError("");
+    try {
+      const cart = await purchaseService.addToCart(tourId);
+      setCartTourIds(new Set(cart.items.map((i) => i.tourId)));
+      window.dispatchEvent(new Event("cart-updated"));
+    } catch (err: unknown) {
+      setError(getPurchaseApiErrorMessage(err, "Failed to add tour to cart"));
+    } finally {
+      setCartActionLoading(false);
+    }
+  };
 
   const loadTours = async () => {
     setLoading(true);
@@ -225,6 +262,9 @@ useEffect(() => {
   useEffect(() => {
     if (isGuide || isTourist) {
       void loadTours();
+      if (isTourist) {
+        void loadPurchaseState();
+      }
     }
   }, [isGuide, isTourist, location]);
 
@@ -293,6 +333,16 @@ useEffect(() => {
             {openTour.archivedAt && (
               <span>Archived: {formatDate(openTour.archivedAt)}</span>
             )}
+            {isTourist && purchasedTourIds.has(openTour.id) && (
+              <span className="rounded-full bg-secondary-soft px-2 py-1 font-medium text-secondary">
+                Purchased
+              </span>
+            )}
+            {isTourist && cartTourIds.has(openTour.id) && (
+              <span className="rounded-full bg-primary-soft px-2 py-1 font-medium text-primary">
+                In cart
+              </span>
+            )}
             {openTour.totalDistanceKm > 0 && (
               <span>Total distance: {openTour.totalDistanceKm.toFixed(2)} km</span>
             )}
@@ -336,6 +386,38 @@ useEffect(() => {
           {isGuide && openTour.status === "Draft" && !canPublishTour && (
             <div className="mt-3 rounded-lg bg-muted/50 px-4 py-3 text-sm text-text-secondary">
               Tour must have at least two key points, one transport time, and tags before it can be published.
+            </div>
+          )}
+
+          {isTourist && openTour.status === "Published" && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {purchasedTourIds.has(openTour.id) ? (
+                <span className="rounded-lg bg-secondary-soft px-4 py-2 text-sm font-medium text-secondary">
+                  You own this tour — all key points unlocked
+                </span>
+              ) : cartTourIds.has(openTour.id) ? (
+                <Link
+                  to="/cart"
+                  className="rounded-lg border bg-surface px-4 py-2 text-sm font-medium text-text-primary hover:bg-muted"
+                >
+                  View cart
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  disabled={cartActionLoading}
+                  onClick={() => void addToCart(openTour.id)}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-60"
+                >
+                  {cartActionLoading ? "Adding..." : "Add to cart"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {isTourist && !purchasedTourIds.has(openTour.id) && openTour.keyPoints.length > 1 && (
+            <div className="mt-3 rounded-lg bg-muted/50 px-4 py-3 text-sm text-text-secondary">
+              Purchase this tour to unlock all {openTour.keyPoints.length} key points.
             </div>
           )}
 
@@ -707,18 +789,48 @@ useEffect(() => {
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="text-xs text-text-muted">
-                    {tour.status} · {tour.difficulty} · {tour.keyPoints.length} visible
-                    {!isGuide && ` · @${tour.authorUsername}`}
-                    {tour.totalDistanceKm > 0 && ` · ${tour.totalDistanceKm.toFixed(1)} km`}
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
+                    <span>
+                      {tour.status} · {tour.difficulty} · {tour.keyPoints.length} key points
+                      {!isGuide && ` · @${tour.authorUsername}`}
+                      {tour.totalDistanceKm > 0 && ` · ${tour.totalDistanceKm.toFixed(1)} km`}
+                    </span>
+                    {isTourist && purchasedTourIds.has(tour.id) && (
+                      <span className="rounded-full bg-secondary-soft px-2 py-0.5 font-medium text-secondary">
+                        Purchased
+                      </span>
+                    )}
+                    {isTourist && cartTourIds.has(tour.id) && (
+                      <span className="rounded-full bg-primary-soft px-2 py-0.5 font-medium text-primary">
+                        In cart
+                      </span>
+                    )}
                   </div>
                   <h2 className="mt-1 text-lg font-semibold leading-snug">
                     {tour.name}
                   </h2>
                 </div>
-                <span className="rounded-full bg-secondary-soft px-3 py-1 text-xs font-medium text-secondary">
-                  Price {tour.price}
-                </span>
+                <div className="flex flex-col items-end gap-2">
+                  <span className="rounded-full bg-secondary-soft px-3 py-1 text-xs font-medium text-secondary">
+                    Price {tour.price}
+                  </span>
+                  {isTourist &&
+                    tour.status === "Published" &&
+                    !purchasedTourIds.has(tour.id) &&
+                    !cartTourIds.has(tour.id) && (
+                      <button
+                        type="button"
+                        disabled={cartActionLoading}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void addToCart(tour.id);
+                        }}
+                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-60"
+                      >
+                        Add to cart
+                      </button>
+                    )}
+                </div>
               </div>
               <p className="mt-3 text-sm text-text-secondary">
                 {tour.description.length > 240

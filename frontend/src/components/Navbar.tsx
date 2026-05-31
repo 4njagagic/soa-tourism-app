@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ToursNavDropdown from "./ToursNavDropdown";
+import { purchaseService } from "../services/purchaseApi";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   [
@@ -14,7 +15,35 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 const Navbar: React.FC = () => {
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
+
+  const isTourist = user?.role === "TOURIST";
+
+  useEffect(() => {
+    if (!isAuthenticated || !isTourist) {
+      setCartCount(0);
+      return;
+    }
+
+    const loadCartCount = async () => {
+      try {
+        const cart = await purchaseService.getCart();
+        setCartCount(cart.items.length);
+      } catch {
+        setCartCount(0);
+      }
+    };
+
+    void loadCartCount();
+
+    const onCartUpdated = () => {
+      void loadCartCount();
+    };
+    window.addEventListener("cart-updated", onCartUpdated);
+    return () => window.removeEventListener("cart-updated", onCartUpdated);
+  }, [isAuthenticated, isTourist, location.pathname]);
 
   const displayName = useMemo(() => {
     const full = `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
@@ -71,6 +100,9 @@ const Navbar: React.FC = () => {
 
                     <NavLink to="/tours" className={navLinkClass}>
                       Tours
+                    </NavLink>
+                    <NavLink to="/cart" className={navLinkClass}>
+                      Cart{cartCount > 0 ? ` (${cartCount})` : ""}
                     </NavLink>
                      <NavLink to="/simulator" className={navLinkClass}>
         Simulator
@@ -162,6 +194,9 @@ const Navbar: React.FC = () => {
                   <>
                   <NavLink to="/tours" className={navLinkClass}>
                     Tours
+                  </NavLink>
+                  <NavLink to="/cart" className={navLinkClass}>
+                    Cart{cartCount > 0 ? ` (${cartCount})` : ""}
                   </NavLink>
                   <NavLink to="/simulator" className={navLinkClass}>
                      Simulator
