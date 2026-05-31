@@ -28,4 +28,6 @@ public interface ITourService
 
     Task<TourResponse?> UpdateKeyPointAsync(string tourId, string pointId, UpdateKeyPointRequest request, string authorUsername, CancellationToken cancellationToken);
     Task<TourResponse?> DeleteKeyPointAsync(string tourId, string pointId, string authorUsername, CancellationToken cancellationToken);
+
+    Task<TourPurchaseValidationResponse?> ValidateTourForPurchaseAsync(string id, CancellationToken cancellationToken);
 }

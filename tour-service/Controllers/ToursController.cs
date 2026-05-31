@@ -12,11 +12,25 @@ public class ToursController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly ITourService _tourService;
+    private readonly IPurchaseService _purchaseService;
 
-    public ToursController(IAuthService authService, ITourService tourService)
+    public ToursController(IAuthService authService, ITourService tourService, IPurchaseService purchaseService)
     {
         _authService = authService;
         _tourService = tourService;
+        _purchaseService = purchaseService;
+    }
+
+    private static string? ExtractBearerToken(HttpRequest request)
+    {
+        var authorization = request.Headers.Authorization.ToString();
+        const string prefix = "Bearer ";
+        if (string.IsNullOrWhiteSpace(authorization) || !authorization.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return authorization[prefix.Length..].Trim();
     }
 
     [HttpPost]
@@ -44,10 +58,17 @@ public class ToursController : ControllerBase
         var tours = await _tourService.GetAllToursAsync(cancellationToken);
         if (string.Equals(user.Role, "TOURIST", StringComparison.OrdinalIgnoreCase))
         {
-            return Ok(tours
-                .Where(t => t.Status == TourStatus.Published)
-                .Select(TourTouristResponse.FromResponse)
-                .ToList());
+            var token = ExtractBearerToken(Request);
+            var published = tours.Where(t => t.Status == TourStatus.Published).ToList();
+            var result = new List<object>();
+
+            foreach (var tour in published)
+            {
+                var purchased = await _purchaseService.HasPurchasedAsync(tour.Id, token ?? string.Empty, cancellationToken);
+                result.Add(purchased ? tour : TourTouristResponse.FromResponse(tour));
+            }
+
+            return Ok(result);
         }
 
         return Ok(tours);
@@ -87,7 +108,9 @@ public class ToursController : ControllerBase
 
         if (tour.Status == TourStatus.Published)
         {
-            return Ok(TourTouristResponse.FromResponse(tour));
+            var token = ExtractBearerToken(Request);
+            var purchased = await _purchaseService.HasPurchasedAsync(id, token ?? string.Empty, cancellationToken);
+            return Ok(purchased ? tour : TourTouristResponse.FromResponse(tour));
         }
 
         return NotFound(new { error = "Tour not found." });
