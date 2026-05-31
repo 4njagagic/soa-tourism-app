@@ -355,4 +355,29 @@ public class TourManagementService : ITourService
         var result = await _repository.UpdateAsync(tour, cancellationToken);
         return result == null ? null : TourResponse.FromTour(result);
     }
+
+    public async Task<TourPurchaseValidationResponse?> ValidateTourForPurchaseAsync(string id, CancellationToken cancellationToken)
+    {
+        var tour = await _repository.GetByIdAsync(id, cancellationToken);
+        if (tour is null)
+        {
+            return null;
+        }
+
+        if (tour.Status == TourStatus.Archived)
+        {
+            throw new InvalidOperationException("Archived tours cannot be purchased.");
+        }
+
+        if (tour.Status != TourStatus.Published)
+        {
+            throw new InvalidOperationException("Only published tours can be purchased.");
+        }
+
+        return new TourPurchaseValidationResponse(
+            tour.Id ?? string.Empty,
+            tour.Name,
+            tour.Price,
+            tour.Status);
+    }
 }

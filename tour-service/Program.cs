@@ -14,6 +14,8 @@ builder.Configuration["Jwt:Secret"] =
     Environment.GetEnvironmentVariable("JWT_SECRET") ?? builder.Configuration["Jwt:Secret"];
 builder.Configuration["Stakeholders:BaseUrl"] =
     Environment.GetEnvironmentVariable("STAKEHOLDERS_SERVICE_URL") ?? builder.Configuration["Stakeholders:BaseUrl"];
+builder.Configuration["Purchase:BaseUrl"] =
+    Environment.GetEnvironmentVariable("PURCHASE_SERVICE_URL") ?? builder.Configuration["Purchase:BaseUrl"];
 builder.Configuration["Uploads:Directory"] =
     Environment.GetEnvironmentVariable("UPLOAD_DIR") ?? builder.Configuration["Uploads:Directory"];
 
@@ -22,9 +24,15 @@ builder.Services.AddSingleton<ITourRepository, MongoTourRepository>();
 builder.Services.AddSingleton<IUserPositionRepository, MongoUserPositionRepository>();
 builder.Services.AddScoped<ITourService, TourManagementService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddHttpClient("stakeholders", client =>
 {
     var baseUrl = builder.Configuration["Stakeholders:BaseUrl"] ?? "http://localhost:8081/api";
+    client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+});
+builder.Services.AddHttpClient("purchase", client =>
+{
+    var baseUrl = builder.Configuration["Purchase:BaseUrl"] ?? "http://localhost:8085/api";
     client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
 });
 

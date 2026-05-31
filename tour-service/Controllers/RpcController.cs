@@ -45,6 +45,11 @@ public class RpcController : ControllerBase
             return BadRequest(CreateError(-32600, "Invalid Request", request?.Id));
         }
 
+        if (string.Equals(request.Method, "ValidateTourForPurchase", StringComparison.Ordinal))
+        {
+            return await HandleValidateTourForPurchaseAsync(request, cancellationToken);
+        }
+
         AuthenticatedAuthor? author = await _authService.RequireGuideAsync(Request, cancellationToken);
         if (author is null)
         {
@@ -72,6 +77,30 @@ public class RpcController : ControllerBase
             }
 
             return Ok(CreateSuccess(tour, request.Id));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(CreateError(400, ex.Message, request.Id));
+        }
+    }
+
+    private async Task<IActionResult> HandleValidateTourForPurchaseAsync(JsonRpcRequest request, CancellationToken cancellationToken)
+    {
+        var id = request.Params?.GetProperty("id").GetString();
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return BadRequest(CreateError(-32602, "Invalid params", request.Id));
+        }
+
+        try
+        {
+            var validation = await _tourService.ValidateTourForPurchaseAsync(id, cancellationToken);
+            if (validation is null)
+            {
+                return NotFound(CreateError(404, "Tour not found", request.Id));
+            }
+
+            return Ok(CreateSuccess(validation, request.Id));
         }
         catch (InvalidOperationException ex)
         {

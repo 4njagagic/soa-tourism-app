@@ -98,6 +98,12 @@ func jsonRPCCall(ctx context.Context, url, method string, params interface{}, au
 	return &rpcResp.Result, nil, nil
 }
 
+func handlePurchaseGRPC(gateway *purchaseGrpcGateway, proxy http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		gateway.handlePurchase(w, r, proxy)
+	}
+}
+
 func handleTourRPC(target string, proxy http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/tours/")
@@ -187,9 +193,16 @@ func main() {
 	blog := getEnv("BLOG_SERVICE_URL", "http://blog-service:"+getEnv("BLOG_SERVICE_PORT", "8081"))
 	tour := getEnv("TOUR_SERVICE_URL", "http://tour-service:"+getEnv("TOUR_SERVICE_PORT", "8083"))
 	stakeholders := getEnv("STAKEHOLDERS_SERVICE_URL", "http://stakeholders-service:"+getEnv("STAKEHOLDERS_SERVICE_PORT", "8080"))
+	purchase := getEnv("PURCHASE_SERVICE_URL", "http://purchase-service:"+getEnv("PURCHASE_SERVICE_PORT", "8085"))
+	purchaseGrpcAddr := getEnv("PURCHASE_SERVICE_GRPC_ADDR", "purchase-service:"+getEnv("PURCHASE_SERVICE_GRPC_PORT", "9095"))
 	follower := getEnv("FOLLOWER_SERVICE_URL", "http://follower-service:"+getEnv("FOLLOWER_SERVICE_PORT", "8082"))
 	frontend := getEnv("FRONTEND_URL", "http://frontend:"+getEnv("FRONTEND_CONTAINER_PORT", "80"))
 	addr := getEnv("GATEWAY_ADDRESS", ":8000")
+
+	purchaseGateway, err := newPurchaseGrpcGateway(purchaseGrpcAddr)
+	if err != nil {
+		log.Fatalf("failed to connect purchase gRPC: %v", err)
+	}
 
 	mux := http.NewServeMux()
 
@@ -220,6 +233,11 @@ func main() {
 	mux.Handle("/api/auth/", proxyTo(stakeholders))
 	mux.Handle("/api/users", proxyTo(stakeholders))
 	mux.Handle("/api/users/", proxyTo(stakeholders))
+
+	// Purchase service (cart) — AddToCart & Checkout via gRPC; rest via REST proxy
+	purchaseProxy := proxyTo(purchase)
+	mux.Handle("/api/cart", handlePurchaseGRPC(purchaseGateway, purchaseProxy))
+	mux.Handle("/api/cart/", handlePurchaseGRPC(purchaseGateway, purchaseProxy))
 
 	// Followers service
 	mux.Handle("/followers", proxyTo(follower))

@@ -18,6 +18,7 @@ import Navbar from "./components/Navbar";
 import AdminUsers from "./pages/AdminUsers";
 import EditKeyPoint from "./pages/EditKeyPoint";
 import Simulator from "./pages/Simulator";
+import Cart from "./pages/Cart";
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -114,6 +115,14 @@ function AppContent() {
               element={
                 <PrivateRoute>
                   <Simulator />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/cart"
+              element={
+                <PrivateRoute>
+                  <Cart />
                 </PrivateRoute>
               }
             />
