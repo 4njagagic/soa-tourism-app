@@ -132,6 +132,7 @@ services:
     container_name: tour-service
     environment:
       ASPNETCORE_URLS: http://+:${TOUR_SERVICE_PORT:-8083}
+      TOUR_SERVICE_GRPC_PORT: ${TOUR_SERVICE_GRPC_PORT:-9093}
       TOUR_MONGO_URI: ${TOUR_MONGO_URI:-mongodb://root:rootpass@mongo:27017}
       TOUR_MONGO_DB_NAME: ${TOUR_MONGO_DB_NAME:-tourism}
       JWT_SECRET: ${JWT_SECRET}
@@ -140,6 +141,7 @@ services:
       UPLOAD_DIR: /app/uploads
     ports:
       - "${TOUR_SERVICE_PORT:-8083}:${TOUR_SERVICE_PORT:-8083}"
+      - "${TOUR_SERVICE_GRPC_PORT:-9093}:${TOUR_SERVICE_GRPC_PORT:-9093}"
     volumes:
       - tour-uploads-data:/app/uploads
     depends_on:
@@ -248,6 +250,7 @@ services:
       TOUR_SERVICE_URL: http://tour-service:${TOUR_SERVICE_PORT}
       PURCHASE_SERVICE_URL: http://purchase-service:${PURCHASE_SERVICE_PORT}
       PURCHASE_SERVICE_GRPC_ADDR: purchase-service:${PURCHASE_SERVICE_GRPC_PORT}
+      TOUR_SERVICE_GRPC_ADDR: tour-service:9093
       STAKEHOLDERS_SERVICE_URL: http://stakeholders-service:${STAKEHOLDERS_SERVICE_PORT}
       FRONTEND_URL: http://frontend:${FRONTEND_CONTAINER_PORT}
       CORS_ALLOW_ORIGIN: "*"

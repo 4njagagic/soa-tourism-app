@@ -1,10 +1,28 @@
 using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using System.Text.Json.Serialization;
 using TourService.Auth;
 using TourService.Repositories;
 using TourService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Kestrel to expose a dedicated gRPC HTTP/2 endpoint when
+// TOUR_SERVICE_GRPC_PORT is set. This allows internal gRPC clients to
+// connect using plain HTTP/2 (insecure) within the container network.
+builder.WebHost.ConfigureKestrel(options =>
+{
+    // Default HTTP endpoint (supports HTTP/1.1 and HTTP/2)
+    var httpPort = int.Parse(Environment.GetEnvironmentVariable("TOUR_SERVICE_PORT") ?? "8083");
+    options.ListenAnyIP(httpPort, listenOptions => { listenOptions.Protocols = HttpProtocols.Http1AndHttp2; });
+
+    // Optional dedicated gRPC port for plain HTTP/2 (no TLS) for internal RPC
+    var grpcPortStr = Environment.GetEnvironmentVariable("TOUR_SERVICE_GRPC_PORT");
+    if (!string.IsNullOrEmpty(grpcPortStr) && int.TryParse(grpcPortStr, out var grpcPort))
+    {
+        options.ListenAnyIP(grpcPort, listenOptions => { listenOptions.Protocols = HttpProtocols.Http2; });
+    }
+});
 
 builder.Configuration["TourDatabase:ConnectionString"] =
     Environment.GetEnvironmentVariable("TOUR_MONGO_URI") ?? builder.Configuration["TourDatabase:ConnectionString"];
@@ -21,8 +39,10 @@ builder.Configuration["Uploads:Directory"] =
 
 builder.Services.Configure<TourDatabaseSettings>(builder.Configuration.GetSection("TourDatabase"));
 builder.Services.AddSingleton<ITourRepository, MongoTourRepository>();
+builder.Services.AddSingleton<ITourExecutionRepository, MongoTourExecutionRepository>();
 builder.Services.AddSingleton<IUserPositionRepository, MongoUserPositionRepository>();
 builder.Services.AddScoped<ITourService, TourManagementService>();
+builder.Services.AddScoped<ITourExecutionService, TourExecutionService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddHttpClient("stakeholders", client =>
@@ -39,6 +59,7 @@ builder.Services.AddHttpClient("purchase", client =>
 builder.Services
     .AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddGrpc();
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -62,6 +83,7 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "/uploads"
 });
 
+app.MapGrpcService<TourService.Grpc.TourExecutionGrpcService>();
 app.MapControllers();
 
 app.Run();
