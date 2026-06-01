@@ -19,6 +19,7 @@ import AdminUsers from "./pages/AdminUsers";
 import EditKeyPoint from "./pages/EditKeyPoint";
 import Simulator from "./pages/Simulator";
 import Cart from "./pages/Cart";
+import TourExecution from "./pages/TourExecution";
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -94,22 +95,22 @@ function AppContent() {
                 </PrivateRoute>
               }
             />
-            <Route 
-              path="/admin-users" 
+            <Route
+              path="/admin-users"
               element={
                 <PrivateRoute>
                   <AdminUsers />
                 </PrivateRoute>
-              } 
+              }
             />
             <Route
-  path="/tours/:tourId/key-points/:pointId/edit"
-  element={
-    <PrivateRoute>
-      <EditKeyPoint />
-    </PrivateRoute>
-  }
-/>
+              path="/tours/:tourId/key-points/:pointId/edit"
+              element={
+                <PrivateRoute>
+                  <EditKeyPoint />
+                </PrivateRoute>
+              }
+            />
             <Route
               path="/simulator"
               element={
@@ -123,6 +124,14 @@ function AppContent() {
               element={
                 <PrivateRoute>
                   <Cart />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/tour-executions/:executionId"
+              element={
+                <PrivateRoute>
+                  <TourExecution />
                 </PrivateRoute>
               }
             />
