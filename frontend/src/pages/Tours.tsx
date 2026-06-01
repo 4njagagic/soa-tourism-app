@@ -105,6 +105,7 @@ const Tours: React.FC = () => {
   const [purchasedTourIds, setPurchasedTourIds] = useState<Set<string>>(new Set());
   const [cartTourIds, setCartTourIds] = useState<Set<string>>(new Set());
   const [cartActionLoading, setCartActionLoading] = useState(false);
+  const [executionLoading, setExecutionLoading] = useState(false);
 
   const openTour = useMemo(
     () => tours.find((tour) => tour.id === openTourId) || null,
@@ -115,13 +116,13 @@ const Tours: React.FC = () => {
     if (!openTour) return false;
     return (
       openTour.status === "Published" ? false :
-      openTour.status === "Draft" &&
-      openTour.name.trim().length > 0 &&
-      openTour.description.trim().length > 0 &&
-      openTour.difficulty.trim().length > 0 &&
-      openTour.tags.length > 0 &&
-      openTour.keyPoints.length >= 2 &&
-      (openTour.transportTimes?.length ?? 0) > 0
+        openTour.status === "Draft" &&
+        openTour.name.trim().length > 0 &&
+        openTour.description.trim().length > 0 &&
+        openTour.difficulty.trim().length > 0 &&
+        openTour.tags.length > 0 &&
+        openTour.keyPoints.length >= 2 &&
+        (openTour.transportTimes?.length ?? 0) > 0
     );
   }, [openTour]);
 
@@ -217,40 +218,63 @@ const Tours: React.FC = () => {
     }
   };
 
-  const fetchRoute = async () => {
-  if (!openTour || visibleKeyPoints.length < 2) {
-    setRouteCoords(visibleKeyPoints.map(kp => [kp.latitude, kp.longitude] as [number, number]));
-    return;
-  }
+  const startTourExecution = async () => {
+    if (!openTour) return;
 
-  try {
-    const query = visibleKeyPoints
-      .map((kp) => `${kp.longitude},${kp.latitude}`)
-      .join(";");
-
-    const response = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${query}?overview=full&geometries=geojson`
-    );
-    const data = await response.json();
-
-    if (data.code === "Ok" && data.routes && data.routes.length > 0) {
-      const coords = data.routes[0].geometry.coordinates.map(
-        (c: [number, number]) => [c[1], c[0]] as [number, number]
+    setExecutionLoading(true);
+    setError("");
+    try {
+      const position = await tourService.getMyPosition();
+      const execution = await tourService.startTourExecution(
+        openTour.id,
+        position.latitude,
+        position.longitude,
       );
-      setRouteCoords(coords);
-    } else {
-      throw new Error("OSRM route not found");
+      if (!execution.id) {
+        throw new Error("Missing execution id in start response");
+      }
+      navigate(`/tour-executions/${execution.id}`);
+    } catch (err: unknown) {
+      setError(getTourApiErrorMessage(err, "Failed to start tour execution"));
+    } finally {
+      setExecutionLoading(false);
     }
-  } catch (err) {
-    console.error("OSRM Routing failed, falling back to straight lines", err);
-    setRouteCoords(openTour.keyPoints.map(kp => [kp.latitude, kp.longitude] as [number, number]));
-  }
-};
-useEffect(() => {
-  if (showMap && openTour) {
-    void fetchRoute();
-  }
-}, [showMap, openTour]);
+  };
+
+  const fetchRoute = async () => {
+    if (!openTour || visibleKeyPoints.length < 2) {
+      setRouteCoords(visibleKeyPoints.map(kp => [kp.latitude, kp.longitude] as [number, number]));
+      return;
+    }
+
+    try {
+      const query = visibleKeyPoints
+        .map((kp) => `${kp.longitude},${kp.latitude}`)
+        .join(";");
+
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${query}?overview=full&geometries=geojson`
+      );
+      const data = await response.json();
+
+      if (data.code === "Ok" && data.routes && data.routes.length > 0) {
+        const coords = data.routes[0].geometry.coordinates.map(
+          (c: [number, number]) => [c[1], c[0]] as [number, number]
+        );
+        setRouteCoords(coords);
+      } else {
+        throw new Error("OSRM route not found");
+      }
+    } catch (err) {
+      console.error("OSRM Routing failed, falling back to straight lines", err);
+      setRouteCoords(openTour.keyPoints.map(kp => [kp.latitude, kp.longitude] as [number, number]));
+    }
+  };
+  useEffect(() => {
+    if (showMap && openTour) {
+      void fetchRoute();
+    }
+  }, [showMap, openTour]);
   useEffect(() => {
     const state = (location.state || {}) as LocationState;
     if (state.openTourId) {
@@ -392,9 +416,19 @@ useEffect(() => {
           {isTourist && openTour.status === "Published" && (
             <div className="mt-4 flex flex-wrap gap-2">
               {purchasedTourIds.has(openTour.id) ? (
-                <span className="rounded-lg bg-secondary-soft px-4 py-2 text-sm font-medium text-secondary">
-                  You own this tour — all key points unlocked
-                </span>
+                <>
+                  <span className="rounded-lg bg-secondary-soft px-4 py-2 text-sm font-medium text-secondary">
+                    You own this tour — all key points unlocked
+                  </span>
+                  <button
+                    type="button"
+                    disabled={executionLoading}
+                    onClick={() => void startTourExecution()}
+                    className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-60"
+                  >
+                    {executionLoading ? "Starting..." : "Start tour"}
+                  </button>
+                </>
               ) : cartTourIds.has(openTour.id) ? (
                 <Link
                   to="/cart"
@@ -415,9 +449,25 @@ useEffect(() => {
             </div>
           )}
 
-          {isTourist && !purchasedTourIds.has(openTour.id) && openTour.keyPoints.length > 1 && (
+          {isTourist && openTour.status === "Published" && !purchasedTourIds.has(openTour.id) && openTour.keyPoints.length > 1 && (
             <div className="mt-3 rounded-lg bg-muted/50 px-4 py-3 text-sm text-text-secondary">
               Purchase this tour to unlock all {openTour.keyPoints.length} key points.
+            </div>
+          )}
+
+          {isTourist && openTour.status === "Archived" && purchasedTourIds.has(openTour.id) && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="rounded-lg bg-secondary-soft px-4 py-2 text-sm font-medium text-secondary">
+                Archived tour available for execution
+              </span>
+              <button
+                type="button"
+                disabled={executionLoading}
+                onClick={() => void startTourExecution()}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-60"
+              >
+                {executionLoading ? "Starting..." : "Start tour"}
+              </button>
             </div>
           )}
 
@@ -508,103 +558,103 @@ useEffect(() => {
             </section>
           )}
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          {openTour.transportTimes?.map((t) => (
-            <div
-              key={`${t.type}-${t.durationMinutes}`}
-              className="rounded-full border border-gray-300 bg-gray-50 px-4 py-2 text-sm shadow-sm"
-            >
-              <span className="font-medium">{t.type}</span>
-              <span className="ml-2 text-gray-600">
-                {t.durationMinutes} min
-              </span>
-            </div>
-          ))}
-        </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {openTour.transportTimes?.map((t) => (
+              <div
+                key={`${t.type}-${t.durationMinutes}`}
+                className="rounded-full border border-gray-300 bg-gray-50 px-4 py-2 text-sm shadow-sm"
+              >
+                <span className="font-medium">{t.type}</span>
+                <span className="ml-2 text-gray-600">
+                  {t.durationMinutes} min
+                </span>
+              </div>
+            ))}
+          </div>
 
           <section className="mt-6">
-           <div className="flex items-center justify-between">
-    <h2 className="text-base font-semibold">Key points</h2>
-    <div className="flex gap-2">
-      {visibleKeyPoints.length > 0 && (
-        <button 
-          onClick={() => setShowMap(!showMap)}
-          className="text-xs font-medium text-primary hover:underline"
-        >
-          {showMap ? "Hide Map" : "Show route"}
-        </button>
-      )}
-      <div className="text-xs text-text-muted">{visibleKeyPoints.length} visible</div>
-    </div>
-  </div>
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">Key points</h2>
+              <div className="flex gap-2">
+                {visibleKeyPoints.length > 0 && (
+                  <button
+                    onClick={() => setShowMap(!showMap)}
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    {showMap ? "Hide Map" : "Show route"}
+                  </button>
+                )}
+                <div className="text-xs text-text-muted">{visibleKeyPoints.length} visible</div>
+              </div>
+            </div>
 
-  {/* MAPA SA LINIJAMA (POLYLINE) */}
-  {showMap && visibleKeyPoints.length > 0 && (
-    <div className="mt-4 h-[350px] w-full rounded-xl border overflow-hidden">
-      <MapContainer 
-        center={[visibleKeyPoints[0].latitude, visibleKeyPoints[0].longitude]} 
-        zoom={13} 
-        className="h-full w-full"
-      >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        {visibleKeyPoints.map((kp) => (
-          <Marker key={kp.id} position={[kp.latitude, kp.longitude]}>
-            <Popup>{kp.name}</Popup>
-          </Marker>
-        ))}
-        <Polyline 
-          positions={routeCoords} 
-          color="#3b82f6" 
-          weight={5}
-          opacity={0.7}
-        />
-      </MapContainer>
-    </div>
-  )}
-
-  <div className="mt-3 space-y-2">
-    {visibleKeyPoints.map((point) => (
-      <div key={point.id} className="group relative rounded-lg border bg-surface p-4 transition-colors hover:border-primary">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <button onClick={() => setSelectedKeyPoint(point)} className="text-left">
-            <h3 className="font-semibold text-text-primary">{point.name}</h3>
-            <p className="mt-1 line-clamp-1 text-sm text-text-secondary">{point.description}</p>
-          </button>
-          <div className="text-xs text-text-muted">
-            {point.order === 1 ? "Start point" : `${point.distanceFromPreviousKm.toFixed(2)} km from previous`}
-          </div>
-        </div>
-        <div className="mt-3 flex items-start justify-between">
-          <div className="flex gap-2">
-            {isGuide && (
-              <>
-                <button 
-                  onClick={() => navigate(`/tours/${openTour.id}/key-points/${point.id}/edit`)}
-                  className="text-xs text-primary hover:underline"
+            {/* MAPA SA LINIJAMA (POLYLINE) */}
+            {showMap && visibleKeyPoints.length > 0 && (
+              <div className="mt-4 h-[350px] w-full rounded-xl border overflow-hidden">
+                <MapContainer
+                  center={[visibleKeyPoints[0].latitude, visibleKeyPoints[0].longitude]}
+                  zoom={13}
+                  className="h-full w-full"
                 >
-                  Edit
-                </button>
-                <button 
-                  onClick={async () => {
-                    if (window.confirm("Delete this point?")) {
-                      const updated = await tourService.deleteKeyPoint(openTour.id, point.id);
-                      setTours(tours.map(t => t.id === updated.id ? updated : t));
-                    }
-                  }}
-                  className="text-xs text-error hover:underline"
-                >
-                  Delete
-                </button>
-              </>
+                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  {visibleKeyPoints.map((kp) => (
+                    <Marker key={kp.id} position={[kp.latitude, kp.longitude]}>
+                      <Popup>{kp.name}</Popup>
+                    </Marker>
+                  ))}
+                  <Polyline
+                    positions={routeCoords}
+                    color="#3b82f6"
+                    weight={5}
+                    opacity={0.7}
+                  />
+                </MapContainer>
+              </div>
             )}
-            <button onClick={() => setSelectedKeyPoint(point)} className="text-xs text-primary font-medium">
-              View
-            </button>
-          </div>
-        </div>
-      </div>
-    ))}
-  </div>
+
+            <div className="mt-3 space-y-2">
+              {visibleKeyPoints.map((point) => (
+                <div key={point.id} className="group relative rounded-lg border bg-surface p-4 transition-colors hover:border-primary">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <button onClick={() => setSelectedKeyPoint(point)} className="text-left">
+                      <h3 className="font-semibold text-text-primary">{point.name}</h3>
+                      <p className="mt-1 line-clamp-1 text-sm text-text-secondary">{point.description}</p>
+                    </button>
+                    <div className="text-xs text-text-muted">
+                      {point.order === 1 ? "Start point" : `${point.distanceFromPreviousKm.toFixed(2)} km from previous`}
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-start justify-between">
+                    <div className="flex gap-2">
+                      {isGuide && (
+                        <>
+                          <button
+                            onClick={() => navigate(`/tours/${openTour.id}/key-points/${point.id}/edit`)}
+                            className="text-xs text-primary hover:underline"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (window.confirm("Delete this point?")) {
+                                const updated = await tourService.deleteKeyPoint(openTour.id, point.id);
+                                setTours(tours.map(t => t.id === updated.id ? updated : t));
+                              }
+                            }}
+                            className="text-xs text-error hover:underline"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                      <button onClick={() => setSelectedKeyPoint(point)} className="text-xs text-primary font-medium">
+                        View
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
 
           <section className="mt-10 border-t pt-8">
@@ -619,7 +669,7 @@ useEffect(() => {
             {isTourist && (
               <div className="mt-6 rounded-xl border bg-muted/30 p-5">
                 <h3 className="font-medium">Leave a review</h3>
-                <form 
+                <form
                   onSubmit={async (e) => {
                     e.preventDefault();
                     const target = e.target as any;
@@ -633,7 +683,7 @@ useEffect(() => {
                         rating: userRating, comment, visitDate, images: files
                       });
                       setTours(tours.map(t => t.id === updated.id ? updated : t));
-                      target.reset(); 
+                      target.reset();
                       setUserRating(5);
                     } catch (err) {
                       setError(getTourApiErrorMessage(err, "Failed to add review"));
@@ -644,23 +694,23 @@ useEffect(() => {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <label className="block text-xs font-medium uppercase text-text-muted">Rating</label>
-                    
-                       <div className="mt-2 flex gap-1">
-            {[1, 2, 3, 4, 5].map((num) => (
-              <button
-                key={num}
-                type="button"
-                onClick={() => setUserRating(num)}
-                className="text-2xl transition-transform hover:scale-110"
-              >
-                <span className={num <= userRating ? "text-yellow-500" : "text-gray-300"}>
-                  ★
-                </span>
-              </button>
-            ))}
-            <span className="ml-2 text-sm text-text-muted self-center">({userRating}/5)</span>
-          </div>
-        </div>
+
+                      <div className="mt-2 flex gap-1">
+                        {[1, 2, 3, 4, 5].map((num) => (
+                          <button
+                            key={num}
+                            type="button"
+                            onClick={() => setUserRating(num)}
+                            className="text-2xl transition-transform hover:scale-110"
+                          >
+                            <span className={num <= userRating ? "text-yellow-500" : "text-gray-300"}>
+                              ★
+                            </span>
+                          </button>
+                        ))}
+                        <span className="ml-2 text-sm text-text-muted self-center">({userRating}/5)</span>
+                      </div>
+                    </div>
                     <div>
                       <label className="block text-xs font-medium uppercase text-text-muted">Visit Date</label>
                       <input type="date" name="visitDate" required className="mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none" />
@@ -699,15 +749,15 @@ useEffect(() => {
                     </div>
                     <p className="mt-2 text-sm text-text-secondary">{rev.comment}</p>
                     <div className="mt-1 text-[11px] text-text-muted">Visited on: {new Date(rev.visitDate).toLocaleDateString()}</div>
-                    
+
                     {rev.images && rev.images.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {rev.images.map((img, idx) => (
                           <a key={idx} href={resolveTourAssetUrl(img)} target="_blank" rel="noreferrer">
-                            <img 
-                              src={resolveTourAssetUrl(img)} 
-                              alt="Review" 
-                              className="h-20 w-20 rounded-md border object-cover hover:opacity-80 transition-opacity" 
+                            <img
+                              src={resolveTourAssetUrl(img)}
+                              alt="Review"
+                              className="h-20 w-20 rounded-md border object-cover hover:opacity-80 transition-opacity"
                             />
                           </a>
                         ))}

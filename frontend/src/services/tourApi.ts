@@ -1,6 +1,10 @@
 import axios from "axios";
 
-export const TOUR_API_URL = import.meta.env.VITE_TOUR_API_URL || "/tour-api/api";
+const runtimeDefault = typeof window !== "undefined" && window.location.hostname === "localhost"
+  ? `${window.location.protocol}//${window.location.hostname}:8000/api`
+  : "/tour-api/api";
+
+export const TOUR_API_URL = import.meta.env.VITE_TOUR_API_URL || runtimeDefault;
 export const TOUR_PUBLIC_BASE = TOUR_API_URL.replace(/\/api\/?$/, "");
 
 export const resolveTourAssetUrl = (url: string) => {
@@ -12,8 +16,8 @@ export const resolveTourAssetUrl = (url: string) => {
 };
 
 export const getTourApiErrorMessage = (err: unknown, fallback: string) => {
-  if (axios.isAxiosError<{ error?: string }>(err)) {
-    return err.response?.data?.error || fallback;
+  if (axios.isAxiosError<{ error?: string; message?: string }>(err)) {
+    return err.response?.data?.error || err.response?.data?.message || fallback;
   }
 
   return fallback;
@@ -71,12 +75,106 @@ export interface Tour {
   transportTimes: TransportTime[]
 }
 
+export type TourExecutionStatus = "Active" | "Completed" | "Abandoned";
+
+export interface TourExecutionKeyPointProgress {
+  keyPointId: string;
+  keyPointName: string;
+  order: number;
+  latitude: number;
+  longitude: number;
+  distanceKm: number;
+  completedAt: string;
+}
+
+export interface TourExecution {
+  id: string;
+  tourId: string;
+  tourName: string;
+  touristUsername: string;
+  status: TourExecutionStatus;
+  startedLatitude: number;
+  startedLongitude: number;
+  finishedLatitude: number | null;
+  finishedLongitude: number | null;
+  totalKeyPoints: number;
+  completedKeyPoints: TourExecutionKeyPointProgress[];
+  startedAt: string;
+  lastActivityAt: string;
+  finishedAt: string | null;
+}
+
+export interface TourExecutionCheckResult {
+  execution: TourExecution;
+  matchedKeyPoint: boolean;
+  completedKeyPoint: TourExecutionKeyPointProgress | null;
+  distanceKm: number | null;
+}
+
 export interface CreateTourRequest {
   name: string;
   description: string;
   difficulty: string;
   tags: string[];
 }
+
+const pick = <T = unknown>(obj: Record<string, unknown> | null | undefined, ...keys: string[]): T | undefined => {
+  if (!obj) return undefined;
+  for (const key of keys) {
+    const value = obj[key];
+    if (value !== undefined && value !== null) {
+      return value as T;
+    }
+  }
+  return undefined;
+};
+
+const normalizeExecutionKeyPoint = (raw: unknown): TourExecutionKeyPointProgress => {
+  const src = (raw ?? {}) as Record<string, unknown>;
+  return {
+    keyPointId: pick<string>(src, "keyPointId", "key_point_id") ?? "",
+    keyPointName: pick<string>(src, "keyPointName", "key_point_name") ?? "",
+    order: Number(pick<number>(src, "order") ?? 0),
+    latitude: Number(pick<number>(src, "latitude") ?? 0),
+    longitude: Number(pick<number>(src, "longitude") ?? 0),
+    distanceKm: Number(pick<number>(src, "distanceKm", "distance_km") ?? 0),
+    completedAt: pick<string>(src, "completedAt", "completed_at") ?? "",
+  };
+};
+
+const normalizeTourExecution = (raw: unknown): TourExecution => {
+  const src = (raw ?? {}) as Record<string, unknown>;
+  const completed = pick<unknown[]>(src, "completedKeyPoints", "completed_key_points") ?? [];
+
+  return {
+    id: pick<string>(src, "id") ?? "",
+    tourId: pick<string>(src, "tourId", "tour_id") ?? "",
+    tourName: pick<string>(src, "tourName", "tour_name") ?? "",
+    touristUsername: pick<string>(src, "touristUsername", "tourist_username") ?? "",
+    status: (pick<string>(src, "status") ?? "Active") as TourExecutionStatus,
+    startedLatitude: Number(pick<number>(src, "startedLatitude", "started_latitude") ?? 0),
+    startedLongitude: Number(pick<number>(src, "startedLongitude", "started_longitude") ?? 0),
+    finishedLatitude: pick<number>(src, "finishedLatitude", "finished_latitude") ?? null,
+    finishedLongitude: pick<number>(src, "finishedLongitude", "finished_longitude") ?? null,
+    totalKeyPoints: Number(pick<number>(src, "totalKeyPoints", "total_key_points") ?? 0),
+    completedKeyPoints: completed.map(normalizeExecutionKeyPoint),
+    startedAt: pick<string>(src, "startedAt", "started_at") ?? "",
+    lastActivityAt: pick<string>(src, "lastActivityAt", "last_activity_at") ?? "",
+    finishedAt: pick<string>(src, "finishedAt", "finished_at") ?? null,
+  };
+};
+
+const normalizeCheckResult = (raw: unknown): TourExecutionCheckResult => {
+  const src = (raw ?? {}) as Record<string, unknown>;
+  const completedKeyPoint = pick<unknown>(src, "completedKeyPoint", "completed_key_point");
+
+  return {
+    execution: normalizeTourExecution(pick<unknown>(src, "execution") ?? {}),
+    matchedKeyPoint: Boolean(pick<boolean>(src, "matchedKeyPoint", "matched_key_point")),
+    completedKeyPoint: completedKeyPoint ? normalizeExecutionKeyPoint(completedKeyPoint) : null,
+    distanceKm: (pick<number>(src, "distanceKm", "distance_km") ?? null) as number | null,
+  };
+};
 
 const tourClient = axios.create({
   baseURL: TOUR_API_URL,
@@ -194,11 +292,11 @@ export const tourService = {
     });
     return res.data;
   },
-    addTransportTime: async (
+  addTransportTime: async (
     tourId: string,
-    data: { 
-      type: 'Walking' | 'Bicycle' | 'Car'; 
-      durationMinutes: number 
+    data: {
+      type: 'Walking' | 'Bicycle' | 'Car';
+      durationMinutes: number
     }
   ): Promise<Tour> => {
     const res = await tourClient.post(`/tours/${tourId}/transport-times`, data);
@@ -218,6 +316,64 @@ export const tourService = {
   reactivateTour: async (tourId: string): Promise<Tour> => {
     const res = await tourClient.post(`/tours/${tourId}/reactivate`);
     return res.data;
+  },
+
+  startTourExecution: async (
+    tourId: string,
+    latitude: number,
+    longitude: number,
+  ): Promise<TourExecution> => {
+    const res = await tourClient.post("/tour-executions/start", {
+      tourId,
+      latitude,
+      longitude,
+    });
+    const data = (res.data ?? {}) as Record<string, unknown>;
+    const executionPayload = pick<unknown>(data, "execution") ?? res.data;
+    return normalizeTourExecution(executionPayload);
+  },
+
+  getTourExecution: async (executionId: string): Promise<TourExecution> => {
+    const res = await tourClient.get(`/tour-executions/${executionId}`);
+    return normalizeTourExecution(res.data);
+  },
+
+  checkNearbyKeyPoint: async (
+    executionId: string,
+    latitude: number,
+    longitude: number,
+  ): Promise<TourExecutionCheckResult> => {
+    const res = await tourClient.post(`/tour-executions/${executionId}/check-nearby-key-point`, {
+      latitude,
+      longitude,
+    });
+    return normalizeCheckResult(res.data);
+  },
+
+  completeTourExecution: async (
+    executionId: string,
+    latitude: number,
+    longitude: number,
+    force?: boolean,
+  ): Promise<TourExecution> => {
+    const res = await tourClient.post(`/tour-executions/${executionId}/complete`, {
+      latitude,
+      longitude,
+      force: !!force,
+    });
+    return normalizeTourExecution(res.data);
+  },
+
+  abandonTourExecution: async (
+    executionId: string,
+    latitude: number,
+    longitude: number,
+  ): Promise<TourExecution> => {
+    const res = await tourClient.post(`/tour-executions/${executionId}/abandon`, {
+      latitude,
+      longitude,
+    });
+    return normalizeTourExecution(res.data);
   }
 };
 

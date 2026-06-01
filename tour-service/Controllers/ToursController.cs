@@ -59,7 +59,7 @@ public class ToursController : ControllerBase
         if (string.Equals(user.Role, "TOURIST", StringComparison.OrdinalIgnoreCase))
         {
             var token = ExtractBearerToken(Request);
-            var published = tours.Where(t => t.Status == TourStatus.Published).ToList();
+            var published = tours.Where(t => t.Status == TourStatus.Published || t.Status == TourStatus.Archived).ToList();
             var result = new List<object>();
 
             foreach (var tour in published)
@@ -106,7 +106,7 @@ public class ToursController : ControllerBase
             return Ok(tour);
         }
 
-        if (tour.Status == TourStatus.Published)
+        if (tour.Status is TourStatus.Published or TourStatus.Archived)
         {
             var token = ExtractBearerToken(Request);
             var purchased = await _purchaseService.HasPurchasedAsync(id, token ?? string.Empty, cancellationToken);
@@ -218,41 +218,41 @@ public class ToursController : ControllerBase
     }
 
     [HttpPost("{id}/reviews")]
-[RequestSizeLimit(20 * 1024 * 1024)] //20MB limit zbog vise slika
-public async Task<ActionResult<TourResponse>> AddReview(string id, [FromForm] AddReviewRequest request, CancellationToken cancellationToken)
-{
-    var user = await _authService.RequireAuthenticatedAsync(Request, cancellationToken);
-    if (user is null)
+    [RequestSizeLimit(20 * 1024 * 1024)] //20MB limit zbog vise slika
+    public async Task<ActionResult<TourResponse>> AddReview(string id, [FromForm] AddReviewRequest request, CancellationToken cancellationToken)
     {
-        return Unauthorized(new { error = "Only authenticated tourists can leave reviews." });
+        var user = await _authService.RequireAuthenticatedAsync(Request, cancellationToken);
+        if (user is null)
+        {
+            return Unauthorized(new { error = "Only authenticated tourists can leave reviews." });
+        }
+
+        var tour = await _tourService.AddReviewAsync(id, request, user.Username, cancellationToken);
+        return tour is null ? NotFound(new { error = "Tour not found." }) : tour;
     }
 
-    var tour = await _tourService.AddReviewAsync(id, request, user.Username, cancellationToken);
-    return tour is null ? NotFound(new { error = "Tour not found." }) : tour;
-}
-
-[HttpPut("{id}/key-points/{pointId}")]
-[RequestSizeLimit(10 * 1024 * 1024)]
-public async Task<ActionResult<TourResponse>> UpdateKeyPoint(string id, string pointId, [FromForm] UpdateKeyPointRequest request, CancellationToken cancellationToken)
-{
-    var author = await _authService.RequireGuideAsync(Request, cancellationToken);
-    if (author is null) return Unauthorized(new { error = "Only guides can manage points." });
-
-    try
+    [HttpPut("{id}/key-points/{pointId}")]
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<ActionResult<TourResponse>> UpdateKeyPoint(string id, string pointId, [FromForm] UpdateKeyPointRequest request, CancellationToken cancellationToken)
     {
-        var tour = await _tourService.UpdateKeyPointAsync(id, pointId, request, author.Username, cancellationToken);
-        return tour is null ? NotFound(new { error = "Tour or point not found." }) : tour;
+        var author = await _authService.RequireGuideAsync(Request, cancellationToken);
+        if (author is null) return Unauthorized(new { error = "Only guides can manage points." });
+
+        try
+        {
+            var tour = await _tourService.UpdateKeyPointAsync(id, pointId, request, author.Username, cancellationToken);
+            return tour is null ? NotFound(new { error = "Tour or point not found." }) : tour;
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
     }
-    catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
-}
 
-[HttpDelete("{id}/key-points/{pointId}")]
-public async Task<ActionResult<TourResponse>> DeleteKeyPoint(string id, string pointId, CancellationToken cancellationToken)
-{
-    var author = await _authService.RequireGuideAsync(Request, cancellationToken);
-    if (author is null) return Unauthorized(new { error = "Only guides can delete points." });
+    [HttpDelete("{id}/key-points/{pointId}")]
+    public async Task<ActionResult<TourResponse>> DeleteKeyPoint(string id, string pointId, CancellationToken cancellationToken)
+    {
+        var author = await _authService.RequireGuideAsync(Request, cancellationToken);
+        if (author is null) return Unauthorized(new { error = "Only guides can delete points." });
 
-    var tour = await _tourService.DeleteKeyPointAsync(id, pointId, author.Username, cancellationToken);
-    return tour is null ? NotFound(new { error = "Tour not found." }) : tour;
-}
+        var tour = await _tourService.DeleteKeyPointAsync(id, pointId, author.Username, cancellationToken);
+        return tour is null ? NotFound(new { error = "Tour not found." }) : tour;
+    }
 }

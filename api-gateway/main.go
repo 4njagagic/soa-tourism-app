@@ -167,6 +167,205 @@ func handleTourRPC(target string, proxy http.Handler) http.HandlerFunc {
 	}
 }
 
+func handleTourExecutionRPC(target string, proxy http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/tour-executions")
+
+		if r.Method == http.MethodPost && path == "/start" {
+			var body struct {
+				TourID   string  `json:"tourId"`
+				Latitude float64 `json:"latitude"`
+				Longitude float64 `json:"longitude"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.TourID == "" {
+				http.Error(w, "Invalid request body: tourId is required", http.StatusBadRequest)
+				return
+			}
+
+			result, rpcErr, err := jsonRPCCall(r.Context(), target, "StartTourExecution", map[string]interface{}{
+				"tourId":    body.TourID,
+				"latitude":  body.Latitude,
+				"longitude": body.Longitude,
+			}, r.Header.Get("Authorization"))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadGateway)
+				return
+			}
+			if rpcErr != nil {
+				status := rpcErr.Code
+				if status < 100 || status >= 600 {
+					status = http.StatusBadRequest
+				}
+				http.Error(w, rpcErr.Message, status)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(*result)
+			return
+		}
+
+		if r.Method == http.MethodGet && path != "" {
+			executionID := strings.TrimPrefix(path, "/")
+			if executionID == "" {
+				proxy.ServeHTTP(w, r)
+				return
+			}
+
+			result, rpcErr, err := jsonRPCCall(r.Context(), target, "GetTourExecution", map[string]interface{}{"id": executionID}, r.Header.Get("Authorization"))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadGateway)
+				return
+			}
+			if rpcErr != nil {
+				status := rpcErr.Code
+				if status < 100 || status >= 600 {
+					status = http.StatusBadRequest
+				}
+				http.Error(w, rpcErr.Message, status)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(*result)
+			return
+		}
+
+		if r.Method == http.MethodPost && strings.HasSuffix(path, "/check-nearby-key-point") {
+			executionID := strings.TrimSuffix(path, "/check-nearby-key-point")
+			executionID = strings.TrimPrefix(executionID, "/")
+			if executionID == "" {
+				proxy.ServeHTTP(w, r)
+				return
+			}
+
+			var body struct {
+				Latitude  float64 `json:"latitude"`
+				Longitude float64 `json:"longitude"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				http.Error(w, "Invalid request body", http.StatusBadRequest)
+				return
+			}
+
+			result, rpcErr, err := jsonRPCCall(r.Context(), target, "CheckNearbyKeyPoint", map[string]interface{}{
+				"executionId": executionID,
+				"latitude":    body.Latitude,
+				"longitude":   body.Longitude,
+			}, r.Header.Get("Authorization"))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadGateway)
+				return
+			}
+			if rpcErr != nil {
+				status := rpcErr.Code
+				if status < 100 || status >= 600 {
+					status = http.StatusBadRequest
+				}
+				http.Error(w, rpcErr.Message, status)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(*result)
+			return
+		}
+
+		if r.Method == http.MethodPost && strings.HasSuffix(path, "/complete") {
+			executionID := strings.TrimSuffix(path, "/complete")
+			executionID = strings.TrimPrefix(executionID, "/")
+			if executionID == "" {
+				proxy.ServeHTTP(w, r)
+				return
+			}
+
+			var body struct {
+				Latitude  float64 `json:"latitude"`
+				Longitude float64 `json:"longitude"`
+				Force     bool    `json:"force"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				http.Error(w, "Invalid request body", http.StatusBadRequest)
+				return
+			}
+
+			params := map[string]interface{}{
+				"executionId": executionID,
+				"latitude":    body.Latitude,
+				"longitude":   body.Longitude,
+			}
+			if body.Force {
+				params["force"] = true
+			}
+
+			result, rpcErr, err := jsonRPCCall(r.Context(), target, "CompleteTourExecution", params, r.Header.Get("Authorization"))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadGateway)
+				return
+			}
+			if rpcErr != nil {
+				status := rpcErr.Code
+				if status < 100 || status >= 600 {
+					status = http.StatusBadRequest
+				}
+				http.Error(w, rpcErr.Message, status)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(*result)
+			return
+		}
+
+		if r.Method == http.MethodPost && strings.HasSuffix(path, "/abandon") {
+			executionID := strings.TrimSuffix(path, "/abandon")
+			executionID = strings.TrimPrefix(executionID, "/")
+			if executionID == "" {
+				proxy.ServeHTTP(w, r)
+				return
+			}
+
+			var body struct {
+				Latitude  float64 `json:"latitude"`
+				Longitude float64 `json:"longitude"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				http.Error(w, "Invalid request body", http.StatusBadRequest)
+				return
+			}
+
+			result, rpcErr, err := jsonRPCCall(r.Context(), target, "AbandonTourExecution", map[string]interface{}{
+				"executionId": executionID,
+				"latitude":    body.Latitude,
+				"longitude":   body.Longitude,
+			}, r.Header.Get("Authorization"))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadGateway)
+				return
+			}
+			if rpcErr != nil {
+				status := rpcErr.Code
+				if status < 100 || status >= 600 {
+					status = http.StatusBadRequest
+				}
+				http.Error(w, rpcErr.Message, status)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(*result)
+			return
+		}
+
+		proxy.ServeHTTP(w, r)
+	}
+}
+
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -204,6 +403,24 @@ func main() {
 		log.Fatalf("failed to connect purchase gRPC: %v", err)
 	}
 
+	// Prefer an explicit gRPC address for the tour service. If the env var is not set
+	// we will not attempt a gRPC connection and will use JSON-RPC HTTP fallback.
+	var tourGateway *tourGrpcGateway
+	if v := os.Getenv("TOUR_SERVICE_GRPC_ADDR"); v != "" {
+		addr := strings.TrimPrefix(v, "http://")
+		addr = strings.TrimPrefix(addr, "https://")
+		g, err := newTourGrpcGateway(addr, tour)
+		if err != nil {
+			log.Printf("failed to connect tour gRPC (%s): %v; falling back to JSON-RPC", addr, err)
+			tourGateway = nil
+		} else {
+			log.Printf("connected to tour gRPC at %s", addr)
+			tourGateway = g
+		}
+	} else {
+		log.Printf("TOUR_SERVICE_GRPC_ADDR not set, using JSON-RPC for tour-service")
+	}
+
 	mux := http.NewServeMux()
 
 	// Health
@@ -223,6 +440,13 @@ func main() {
 	tourProxy := proxyTo(tour)
 	mux.Handle("/api/tours", handleTourRPC(tour, tourProxy))
 	mux.Handle("/api/tours/", handleTourRPC(tour, tourProxy))
+	if tourGateway != nil {
+		mux.Handle("/api/tour-executions", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { tourGateway.handleTourExecution(w, r, tourProxy) }))
+		mux.Handle("/api/tour-executions/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { tourGateway.handleTourExecution(w, r, tourProxy) }))
+	} else {
+		mux.Handle("/api/tour-executions", handleTourExecutionRPC(tour, tourProxy))
+		mux.Handle("/api/tour-executions/", handleTourExecutionRPC(tour, tourProxy))
+	}
 	mux.Handle("/api/user-positions", tourProxy)
 	mux.Handle("/api/user-positions/", tourProxy)
 
