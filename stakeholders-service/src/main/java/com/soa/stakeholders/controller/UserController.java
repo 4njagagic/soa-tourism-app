@@ -82,4 +82,24 @@ public class UserController {
       }
     }
 
+    @PostMapping("/internal/debit")
+    public ResponseEntity<?> debit(@RequestParam String username, @RequestParam Double amount) {
+    try {
+        userService.debit(username, amount);
+        return ResponseEntity.ok().build();
+    } catch (Exception e) {
+        return ResponseEntity.badRequest().body(e.getMessage());
+    }
+}
+
+    @PostMapping("/internal/credit")
+    public ResponseEntity<?> credit(@RequestParam String username, @RequestParam Double amount) {
+    try {
+        userService.credit(username, amount);
+        return ResponseEntity.ok().build();
+    } catch (Exception e) {
+        return ResponseEntity.badRequest().body(e.getMessage());
+    }
+}
+
 }

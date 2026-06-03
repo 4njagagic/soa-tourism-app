@@ -27,6 +27,8 @@ public class CartService {
     private final ShoppingCartRepository cartRepository;
     private final TourPurchaseTokenRepository tokenRepository;
     private final TourRpcClient tourRpcClient;
+    private final StakeholdersClient stakeholdersClient;
+
 
     @Transactional(readOnly = true)
     public CartResponse getCart(String username) {
@@ -86,33 +88,44 @@ public class CartService {
     public CheckoutResponse checkout(String username) {
         ShoppingCart cart = cartRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Cart is empty."));
-
+        
         if (cart.getItems().isEmpty()) {
             throw new IllegalArgumentException("Cart is empty.");
         }
 
         BigDecimal totalPaid = cart.getTotalPrice();
+
+        stakeholdersClient.debit(username, totalPaid);
+
         List<CheckoutResponse.PurchaseTokenResponse> tokens = new ArrayList<>();
 
-        for (OrderItem item : List.copyOf(cart.getItems())) {
-            tourRpcClient.validateTourForPurchase(item.getTourId());
+        try {
+            for (OrderItem item : List.copyOf(cart.getItems())) {
+                boolean registered = tourRpcClient.registerPurchase(item.getTourId(), username);
+                if (!registered) {
+                    throw new RuntimeException("Could not register tour ownership in Tour Service.");
+                }
 
-            String tokenValue = UUID.randomUUID().toString();
-            Instant purchasedAt = Instant.now();
+                String tokenValue = UUID.randomUUID().toString();
+                Instant now = Instant.now();
 
-            tokenRepository.save(TourPurchaseToken.builder()
-                    .username(username)
-                    .tourId(item.getTourId())
-                    .token(tokenValue)
-                    .purchasedAt(purchasedAt)
-                    .build());
+                tokenRepository.save(TourPurchaseToken.builder()
+                        .username(username)
+                        .tourId(item.getTourId())
+                        .token(tokenValue)
+                        .purchasedAt(now)
+                        .build());
 
-            tokens.add(CheckoutResponse.PurchaseTokenResponse.builder()
-                    .tourId(item.getTourId())
-                    .tourName(item.getTourName())
-                    .token(tokenValue)
-                    .purchasedAt(purchasedAt)
-                    .build());
+                tokens.add(CheckoutResponse.PurchaseTokenResponse.builder()
+                        .tourId(item.getTourId())
+                        .tourName(item.getTourName())
+                        .token(tokenValue)
+                        .purchasedAt(now)
+                        .build());
+            }
+        } catch (Exception e) {
+            stakeholdersClient.credit(username, totalPaid);
+            throw new RuntimeException("SAGA Checkout failed, money refunded: " + e.getMessage());
         }
 
         cart.getItems().clear();
@@ -164,4 +177,5 @@ public class CartService {
                 .items(List.of())
                 .build();
     }
+
 }

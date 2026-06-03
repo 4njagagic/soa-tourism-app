@@ -92,6 +92,19 @@ public class RpcController : ControllerBase
                 _ => BadRequest(CreateError(-32601, "Method not found", request.Id))
             };
         }
+        if (string.Equals(request.Method, "RegisterPurchase", StringComparison.Ordinal))
+{
+    var tourId = GetRequiredStringParam(request, "tourId");
+    var username = GetRequiredStringParam(request, "username");
+    
+    if (tourId == null || username == null) 
+        return BadRequest(CreateError(-32602, "Invalid params", request.Id));
+
+    var success = await _tourService.RegisterPurchaseAsync(tourId, username, cancellationToken);
+    return success 
+        ? Ok(CreateSuccess(new { status = "registered" }, request.Id))
+        : NotFound(CreateError(404, "Tour not found", request.Id));
+}
 
         AuthenticatedAuthor? author = await _authService.RequireGuideAsync(Request, cancellationToken);
         if (author is null)

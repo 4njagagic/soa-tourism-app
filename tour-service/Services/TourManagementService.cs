@@ -380,4 +380,18 @@ public class TourManagementService : ITourService
             tour.Price,
             tour.Status);
     }
+
+    public async Task<bool> RegisterPurchaseAsync(string tourId, string username, CancellationToken ct)
+    {
+    var tour = await _repository.GetByIdAsync(tourId, ct);
+    if (tour == null) return false;
+    
+    if (!tour.PurchasedBy.Contains(username))
+    {
+        tour.PurchasedBy.Add(username);
+        await _repository.UpdateAsync(tour, ct);
+    }
+    return true;
+}
+
 }
