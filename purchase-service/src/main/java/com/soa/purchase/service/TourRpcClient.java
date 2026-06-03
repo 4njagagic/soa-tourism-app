@@ -36,9 +36,8 @@ public class TourRpcClient {
         return executeRequest(payload);
     }
 
-    /**
-     * SAGA KORAK: Registruje kupovinu u Tour servisu.
-     */
+    //saga: registruje kupovinu u tour servisu
+     
     public boolean registerPurchase(String tourId, String username) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("jsonrpc", "2.0");
@@ -67,7 +66,7 @@ public class TourRpcClient {
     }
 
     private TourPurchaseInfo executeRequest(Map<String, Object> payload) {
-        try {
+          try {
             String body = objectMapper.writeValueAsString(payload);
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(tourServiceUrl + "/rpc"))
@@ -79,16 +78,23 @@ public class TourRpcClient {
             JsonNode root = objectMapper.readTree(response.body());
 
             if (response.statusCode() >= 400 || (root.has("error") && !root.get("error").isNull())) {
-                throw new IllegalArgumentException("RPC Error: " + (root.has("error") ? root.get("error").get("message").asText() : "Unknown"));
+                String errorMsg = root.has("error") ? extractErrorMessage(root.get("error")) : "HTTP " + response.statusCode();
+                throw new IllegalArgumentException("RPC Error: " + errorMsg);
             }
 
             JsonNode result = root.get("result");
+            if (result == null || result.isNull()) {
+                throw new IllegalArgumentException("Tour validation returned empty result.");
+            }
+
             return TourPurchaseInfo.builder()
                     .id(readText(result, "id", "Id"))
                     .name(readText(result, "name", "Name"))
                     .price(readDecimal(result, "price", "Price"))
                     .status(readText(result, "status", "Status"))
                     .build();
+        } catch (IllegalArgumentException e) {
+            throw e; 
         } catch (Exception e) {
             throw new RuntimeException("RPC Call failed: " + e.getMessage());
         }
@@ -96,15 +102,29 @@ public class TourRpcClient {
 
     private String readText(JsonNode node, String... fieldNames) {
         for (String fieldName : fieldNames) {
-            if (node.hasNonNull(fieldName)) return node.get(fieldName).asText();
+            JsonNode value = node.get(fieldName);
+            if (value != null && !value.isNull()) {
+                return value.asText();
+            }
         }
-        return "";
+        throw new IllegalArgumentException("Missing required field in tour validation response.");
     }
 
     private BigDecimal readDecimal(JsonNode node, String... fieldNames) {
-        for (String fieldName : fieldNames) {
-            if (node.hasNonNull(fieldName)) return node.get(fieldName).decimalValue();
+       for (String fieldName : fieldNames) {
+            JsonNode value = node.get(fieldName);
+            if (value != null && !value.isNull()) {
+                if (value.isNumber()) {
+                    return value.decimalValue();
+                }
+                return new BigDecimal(value.asText());
+            }
         }
-        return BigDecimal.ZERO;
+        throw new IllegalArgumentException("Missing price in tour validation response.");
+    }
+     private String extractErrorMessage(JsonNode error) {
+        if (error.hasNonNull("message")) return error.get("message").asText();
+        if (error.hasNonNull("Message")) return error.get("Message").asText();
+        return "Tour validation failed";
     }
 }
