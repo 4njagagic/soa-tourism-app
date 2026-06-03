@@ -40,9 +40,10 @@ public class MongoTourRepository : ITourRepository
 
     public async Task<Tour?> GetByIdAsync(string id, CancellationToken cancellationToken)
     {
-        return await _tours
-            .Find(t => t.Id == id)
-            .FirstOrDefaultAsync(cancellationToken);
+    if (!ObjectId.TryParse(id, out var objectId)) return null;
+    
+    var filter = Builders<Tour>.Filter.Eq("_id", objectId);
+    return await _tours.Find(filter).FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task<Tour?> GetByIdAndAuthorAsync(string id, string authorUsername, CancellationToken cancellationToken)
@@ -115,12 +116,16 @@ public async Task<Tour?> DeleteKeyPointAsync(string id, string authorUsername, s
 
     public async Task<Tour?> UpdateAsync(Tour tour, CancellationToken cancellationToken)
     {
-        var result = await _tours.ReplaceOneAsync(
-            t => t.Id == tour.Id,
-            tour,
-            new ReplaceOptions { IsUpsert = false },
-            cancellationToken);
+        
+    if (!ObjectId.TryParse(tour.Id, out var objectId)) return null;
 
-        return result.IsAcknowledged ? tour : null;
+    var filter = Builders<Tour>.Filter.Eq("_id", objectId);
+    var result = await _tours.ReplaceOneAsync(
+        filter,
+        tour,
+        new ReplaceOptions { IsUpsert = false },
+        cancellationToken);
+
+    return result.ModifiedCount > 0 || result.MatchedCount > 0 ? tour : null;
     }
 }

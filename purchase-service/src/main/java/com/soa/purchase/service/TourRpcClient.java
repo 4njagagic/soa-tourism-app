@@ -59,7 +59,9 @@ public class TourRpcClient {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             JsonNode root = objectMapper.readTree(response.body());
 
-            return response.statusCode() == 200 && !root.has("error");
+            boolean hasError = root.has("error") && !root.get("error").isNull();
+
+            return response.statusCode() == 200 && !hasError;
         } catch (Exception e) {
             return false;
         }
