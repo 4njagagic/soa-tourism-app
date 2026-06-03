@@ -129,4 +129,23 @@ public class UserService {
         user.setEnabled(false); 
     userRepository.save(user);
     }
+
+    @Transactional
+    public void debit(String username, Double amount) {
+    User user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    if (user.getBalance() < amount) {
+        throw new IllegalStateException("Insufficient funds");
+    }
+    user.setBalance(user.getBalance() - amount);
+    userRepository.save(user);
+    }
+
+    @Transactional
+    public void credit(String username, Double amount) {
+    User user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    user.setBalance(user.getBalance() + amount);
+    userRepository.save(user);
+   }
 }

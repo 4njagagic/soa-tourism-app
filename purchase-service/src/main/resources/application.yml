@@ -23,6 +23,9 @@ jwt:
 tour-service:
   url: ${TOUR_SERVICE_URL:http://tour-service:8083}
 
+stakeholders-service:
+  url: ${STAKEHOLDERS_SERVICE_URL:http://stakeholders-service:8081/api}
+
 grpc:
   server:
     port: ${GRPC_SERVER_PORT:9095}

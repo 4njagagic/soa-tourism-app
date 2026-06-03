@@ -13,7 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"}, allowedHeaders = "*", allowCredentials = "true")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001", "http://localhost:8000"}, allowedHeaders = "*", allowCredentials = "true")
 public class UserController {
 
     private final UserService userService;
@@ -81,5 +81,25 @@ public class UserController {
         return ResponseEntity.notFound().build();
       }
     }
+
+    @PostMapping("/internal/debit")
+    public ResponseEntity<?> debit(@RequestParam String username, @RequestParam Double amount) {
+    try {
+        userService.debit(username, amount);
+        return ResponseEntity.ok().build();
+    } catch (Exception e) {
+        return ResponseEntity.badRequest().body(e.getMessage());
+    }
+}
+
+    @PostMapping("/internal/credit")
+    public ResponseEntity<?> credit(@RequestParam String username, @RequestParam Double amount) {
+    try {
+        userService.credit(username, amount);
+        return ResponseEntity.ok().build();
+    } catch (Exception e) {
+        return ResponseEntity.badRequest().body(e.getMessage());
+    }
+}
 
 }

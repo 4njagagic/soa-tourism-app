@@ -27,12 +27,13 @@ type Handler struct {
 	Blogs     *service.BlogService
 	Comments  *service.CommentService
 	Likes     *service.LikeService
+	Stakeholders *service.StakeholdersClient
 	UploadDir string
 	JWTSecret string
 }
 
-func New(blogs *service.BlogService, comments *service.CommentService, likes *service.LikeService, uploadDir string, jwtSecret string) *Handler {
-	return &Handler{Blogs: blogs, Comments: comments, Likes: likes, UploadDir: uploadDir, JWTSecret: jwtSecret}
+func New(blogs *service.BlogService, comments *service.CommentService, likes *service.LikeService, stakeholders *service.StakeholdersClient,uploadDir string, jwtSecret string) *Handler {
+	return &Handler{Blogs: blogs, Comments: comments, Likes: likes,Stakeholders: stakeholders, UploadDir: uploadDir, JWTSecret: jwtSecret}
 }
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
@@ -41,57 +42,64 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) CreateBlog(w http.ResponseWriter, r *http.Request) {
+	
 	username, ok := middleware.UsernameFromContext(r.Context())
 	if !ok {
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 		return
 	}
 
+	var blogToCreate domain.Blog
 	contentType := r.Header.Get("Content-Type")
+
 	if strings.HasPrefix(contentType, "multipart/form-data") {
-		// Safety limit for uploads.
-		r.Body = http.MaxBytesReader(w, r.Body, 25<<20) // 25MB
+		r.Body = http.MaxBytesReader(w, r.Body, 25<<20)
 		if err := r.ParseMultipartForm(25 << 20); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid multipart form"})
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid form"})
 			return
 		}
-
-		title := strings.TrimSpace(r.FormValue("title"))
-		description := strings.TrimSpace(r.FormValue("description"))
-		imageURLs, err := h.saveUploadedImages(r.MultipartForm)
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
-			return
-		}
-
-		created, err := h.Blogs.CreateBlog(r.Context(), domain.Blog{
-			Title:          title,
-			DescriptionMD:  description,
-			ImageURLs:      imageURLs,
+		imageURLs, _ := h.saveUploadedImages(r.MultipartForm)
+		blogToCreate = domain.Blog{
+			Title: r.FormValue("title"),
+			DescriptionMD: r.FormValue("description"),
+			ImageURLs: imageURLs,
 			AuthorUsername: username,
-		})
-		if err != nil {
-			writeServiceError(w, err)
+		}
+	} else {
+		var req dto.CreateBlogRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
 			return
 		}
-		writeJSON(w, http.StatusCreated, toBlogResponse(created, 0, nil))
-		return
+		blogToCreate = domain.Blog{
+			Title: req.Title,
+			DescriptionMD: req.Description,
+			ImageURLs: req.ImageURLs,
+			AuthorUsername: username,
+		}
 	}
 
-	var req dto.CreateBlogRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
-		return
-	}
-
-	created, err := h.Blogs.CreateBlog(r.Context(), domain.Blog{
-		Title:          req.Title,
-		DescriptionMD:  req.Description,
-		ImageURLs:      req.ImageURLs,
-		AuthorUsername: username,
-	})
+	created, err := h.Blogs.CreateBlog(r.Context(), blogToCreate)
 	if err != nil {
 		writeServiceError(w, err)
+		return
+	}
+
+	profile, err := h.Stakeholders.GetUserProfile(r.Context(), username)
+	
+	if err != nil || profile == nil || !profile.Enabled {
+		
+		_ = h.Blogs.DeleteBlog(r.Context(), created.ID)
+		
+		for _, imgURL := range created.ImageURLs {
+			fileName := filepath.Base(imgURL)
+			fullPath := filepath.Join(h.UploadDir, "blogs", fileName)
+			_ = os.Remove(fullPath)
+		}
+
+		writeJSON(w, http.StatusForbidden, map[string]any{
+			"error": "SAGA ROLLBACK: User account is disabled. Blog and images removed.",
+		})
 		return
 	}
 

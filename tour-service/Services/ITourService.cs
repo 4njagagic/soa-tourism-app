@@ -30,4 +30,7 @@ public interface ITourService
     Task<TourResponse?> DeleteKeyPointAsync(string tourId, string pointId, string authorUsername, CancellationToken cancellationToken);
 
     Task<TourPurchaseValidationResponse?> ValidateTourForPurchaseAsync(string id, CancellationToken cancellationToken);
+
+    Task<bool> RegisterPurchaseAsync(string tourId, string username, CancellationToken ct);
+
 }

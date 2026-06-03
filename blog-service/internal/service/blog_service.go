@@ -91,3 +91,8 @@ func (s *BlogService) ListBlogsByFollowed(ctx context.Context, username string) 
 
 	return filtered, nil
 }
+
+func (s *BlogService) DeleteBlog(ctx context.Context, id domain.BlogID) error {
+	return s.blogs.Delete(ctx, id) 
+    // Napomena: Implementiraj DeleteBlog u postgres/blog_repository.go (samo exec "DELETE FROM blogs WHERE id = $1")
+}
