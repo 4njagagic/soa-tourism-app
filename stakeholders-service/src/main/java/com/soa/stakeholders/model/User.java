@@ -52,7 +52,7 @@ public class User implements UserDetails {
     @Builder.Default
     private Boolean enabled = true;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     @Builder.Default
     private Double balance = 1000.0;
 
