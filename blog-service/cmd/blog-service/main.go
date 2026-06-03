@@ -38,6 +38,9 @@ func main() {
 	likeRepo := postgres.NewLikeRepository(db)
 
 	followerClient := service.NewFollowerClient(cfg.FollowerServiceURL)
+	
+	stkClient := service.NewStakeholdersClient(cfg.StakeholdersServiceURL) 
+
 	blogSvc := service.NewBlogServiceWithFollowers(blogRepo, followerClient)
 	commentSvc := service.NewCommentService(commentRepo)
 	likeSvc := service.NewLikeService(likeRepo)
@@ -46,7 +49,7 @@ func main() {
 		log.Fatalf("upload dir init error (%s): %v", filepath.Clean(cfg.UploadDir), err)
 	}
 
-	handler := handlers.New(blogSvc, commentSvc, likeSvc, cfg.UploadDir, cfg.JWTSecret)
+	handler := handlers.New(blogSvc, commentSvc, likeSvc, stkClient, cfg.UploadDir, cfg.JWTSecret)
 
 	h := httpapi.NewRouter(cfg, handler)
 	srv := &http.Server{

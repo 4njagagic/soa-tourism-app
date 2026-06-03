@@ -71,3 +71,8 @@ func (r *BlogRepository) List(ctx context.Context) ([]domain.Blog, error) {
 	}
 	return out, nil
 }
+func (r *BlogRepository) Delete(ctx context.Context, id domain.BlogID) error {
+	query := `DELETE FROM blogs WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, string(id))
+	return err
+}
