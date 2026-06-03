@@ -10,6 +10,7 @@ type BlogRepository interface {
 	Create(ctx context.Context, blog domain.Blog) (domain.Blog, error)
 	GetByID(ctx context.Context, id domain.BlogID) (domain.Blog, error)
 	List(ctx context.Context) ([]domain.Blog, error)
+	Delete(ctx context.Context, id domain.BlogID) error
 }
 
 type CommentRepository interface {

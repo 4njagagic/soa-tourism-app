@@ -385,6 +385,10 @@ public class TourManagementService : ITourService
     {
     var tour = await _repository.GetByIdAsync(tourId, ct);
     if (tour == null) return false;
+
+    if (tour.PurchasedBy == null) {
+        tour.PurchasedBy = new List<string>();
+    }
     
     if (!tour.PurchasedBy.Contains(username))
     {

@@ -13,7 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"}, allowedHeaders = "*", allowCredentials = "true")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001", "http://localhost:8000"}, allowedHeaders = "*", allowCredentials = "true")
 public class UserController {
 
     private final UserService userService;
