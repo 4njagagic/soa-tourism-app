@@ -16,6 +16,11 @@ public class KeyPoint
 
     public double Longitude { get; set; }
 
+    public int Order { get; set; }
+
+    [BsonRepresentation(BsonType.Decimal128)]
+    public decimal DistanceFromPreviousKm { get; set; }
+
     public string ImageUrl { get; set; } = string.Empty;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

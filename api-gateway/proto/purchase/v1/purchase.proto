@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package purchase.v1;
+
+option go_package = "soa-tourism-app/api-gateway/gen/purchase/v1;purchasev1";
+
+service CartService {
+  rpc AddToCart(AddToCartRequest) returns (CartResponse);
+  rpc Checkout(CheckoutRequest) returns (CheckoutResponse);
+}
+
+message AddToCartRequest {
+  string tour_id = 1;
+}
+
+message CheckoutRequest {}
+
+message OrderItem {
+  string tour_id = 1;
+  string tour_name = 2;
+  string price = 3;
+}
+
+message CartResponse {
+  string username = 1;
+  string total_price = 2;
+  repeated OrderItem items = 3;
+}
+
+message PurchaseToken {
+  string tour_id = 1;
+  string tour_name = 2;
+  string token = 3;
+  string purchased_at = 4;
+}
+
+message CheckoutResponse {
+  string total_paid = 1;
+  repeated PurchaseToken tokens = 2;
+}

@@ -8,6 +8,10 @@ import {
   resolveTourAssetUrl,
   tourService,
 } from "../services/tourApi";
+import {
+  getPurchaseApiErrorMessage,
+  purchaseService,
+} from "../services/purchaseApi";
 import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
 
 type LocationState = { openTourId?: string };
@@ -95,11 +99,67 @@ const Tours: React.FC = () => {
   const [userRating, setUserRating] = useState(5);
   const [showMap, setShowMap] = useState(false);
   const [routeCoords, setRouteCoords] = useState<[number, number][]>([]);
+  const [transportType, setTransportType] = useState<"Walking" | "Bicycle" | "Car">("Walking");
+  const [durationMinutes, setDurationMinutes] = useState(60);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [purchasedTourIds, setPurchasedTourIds] = useState<Set<string>>(new Set());
+  const [cartTourIds, setCartTourIds] = useState<Set<string>>(new Set());
+  const [cartActionLoading, setCartActionLoading] = useState(false);
+  const [executionLoading, setExecutionLoading] = useState(false);
 
   const openTour = useMemo(
     () => tours.find((tour) => tour.id === openTourId) || null,
     [openTourId, tours],
   );
+
+  const canPublishTour = useMemo(() => {
+    if (!openTour) return false;
+    return (
+      openTour.status === "Published" ? false :
+        openTour.status === "Draft" &&
+        openTour.name.trim().length > 0 &&
+        openTour.description.trim().length > 0 &&
+        openTour.difficulty.trim().length > 0 &&
+        openTour.tags.length > 0 &&
+        openTour.keyPoints.length >= 2 &&
+        (openTour.transportTimes?.length ?? 0) > 0
+    );
+  }, [openTour]);
+
+  const visibleKeyPoints = useMemo(() => {
+    if (!openTour) return [];
+    if (isGuide) return openTour.keyPoints;
+    if (purchasedTourIds.has(openTour.id)) return openTour.keyPoints;
+    return openTour.keyPoints.slice(0, 1);
+  }, [openTour, isGuide, purchasedTourIds]);
+
+  const loadPurchaseState = async () => {
+    try {
+      const [purchases, cart] = await Promise.all([
+        purchaseService.getPurchases(),
+        purchaseService.getCart(),
+      ]);
+      setPurchasedTourIds(new Set(purchases.map((p) => p.tourId)));
+      setCartTourIds(new Set(cart.items.map((i) => i.tourId)));
+    } catch {
+      setPurchasedTourIds(new Set());
+      setCartTourIds(new Set());
+    }
+  };
+
+  const addToCart = async (tourId: string) => {
+    setCartActionLoading(true);
+    setError("");
+    try {
+      const cart = await purchaseService.addToCart(tourId);
+      setCartTourIds(new Set(cart.items.map((i) => i.tourId)));
+      window.dispatchEvent(new Event("cart-updated"));
+    } catch (err: unknown) {
+      setError(getPurchaseApiErrorMessage(err, "Failed to add tour to cart"));
+    } finally {
+      setCartActionLoading(false);
+    }
+  };
 
   const loadTours = async () => {
     setLoading(true);
@@ -116,40 +176,105 @@ const Tours: React.FC = () => {
     }
   };
 
-  const fetchRoute = async () => {
-  if (!openTour || openTour.keyPoints.length < 2) {
-    setRouteCoords(openTour?.keyPoints.map(kp => [kp.latitude, kp.longitude] as [number, number]) || []);
-    return;
-  }
-
-  try {
-    const query = openTour.keyPoints
-      .map((kp) => `${kp.longitude},${kp.latitude}`)
-      .join(";");
-
-    const response = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${query}?overview=full&geometries=geojson`
-    );
-    const data = await response.json();
-
-    if (data.code === "Ok" && data.routes && data.routes.length > 0) {
-      const coords = data.routes[0].geometry.coordinates.map(
-        (c: [number, number]) => [c[1], c[0]] as [number, number]
-      );
-      setRouteCoords(coords);
-    } else {
-      throw new Error("OSRM route not found");
+  const publishTour = async () => {
+    if (!openTour) return;
+    setActionLoading(true);
+    setError("");
+    try {
+      const updated = await tourService.publishTour(openTour.id);
+      setTours((prev) => prev.map((tour) => (tour.id === updated.id ? updated : tour)));
+    } catch (err: unknown) {
+      setError(getTourApiErrorMessage(err, "Failed to publish tour"));
+    } finally {
+      setActionLoading(false);
     }
-  } catch (err) {
-    console.error("OSRM Routing failed, falling back to straight lines", err);
-    setRouteCoords(openTour.keyPoints.map(kp => [kp.latitude, kp.longitude] as [number, number]));
-  }
-};
-useEffect(() => {
-  if (showMap && openTour) {
-    void fetchRoute();
-  }
-}, [showMap, openTour]);
+  };
+
+  const archiveTour = async () => {
+    if (!openTour) return;
+    setActionLoading(true);
+    setError("");
+    try {
+      const updated = await tourService.archiveTour(openTour.id);
+      setTours((prev) => prev.map((tour) => (tour.id === updated.id ? updated : tour)));
+    } catch (err: unknown) {
+      setError(getTourApiErrorMessage(err, "Failed to archive tour"));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const reactivateTour = async () => {
+    if (!openTour) return;
+    setActionLoading(true);
+    setError("");
+    try {
+      const updated = await tourService.reactivateTour(openTour.id);
+      setTours((prev) => prev.map((tour) => (tour.id === updated.id ? updated : tour)));
+    } catch (err: unknown) {
+      setError(getTourApiErrorMessage(err, "Failed to reactivate tour"));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const startTourExecution = async () => {
+    if (!openTour) return;
+
+    setExecutionLoading(true);
+    setError("");
+    try {
+      const position = await tourService.getMyPosition();
+      const execution = await tourService.startTourExecution(
+        openTour.id,
+        position.latitude,
+        position.longitude,
+      );
+      if (!execution.id) {
+        throw new Error("Missing execution id in start response");
+      }
+      navigate(`/tour-executions/${execution.id}`);
+    } catch (err: unknown) {
+      setError(getTourApiErrorMessage(err, "Failed to start tour execution"));
+    } finally {
+      setExecutionLoading(false);
+    }
+  };
+
+  const fetchRoute = async () => {
+    if (!openTour || visibleKeyPoints.length < 2) {
+      setRouteCoords(visibleKeyPoints.map(kp => [kp.latitude, kp.longitude] as [number, number]));
+      return;
+    }
+
+    try {
+      const query = visibleKeyPoints
+        .map((kp) => `${kp.longitude},${kp.latitude}`)
+        .join(";");
+
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${query}?overview=full&geometries=geojson`
+      );
+      const data = await response.json();
+
+      if (data.code === "Ok" && data.routes && data.routes.length > 0) {
+        const coords = data.routes[0].geometry.coordinates.map(
+          (c: [number, number]) => [c[1], c[0]] as [number, number]
+        );
+        setRouteCoords(coords);
+      } else {
+        throw new Error("OSRM route not found");
+      }
+    } catch (err) {
+      console.error("OSRM Routing failed, falling back to straight lines", err);
+      setRouteCoords(openTour.keyPoints.map(kp => [kp.latitude, kp.longitude] as [number, number]));
+    }
+  };
+  useEffect(() => {
+    if (showMap && openTour) {
+      void fetchRoute();
+    }
+  }, [showMap, openTour]);
   useEffect(() => {
     const state = (location.state || {}) as LocationState;
     if (state.openTourId) {
@@ -161,6 +286,9 @@ useEffect(() => {
   useEffect(() => {
     if (isGuide || isTourist) {
       void loadTours();
+      if (isTourist) {
+        void loadPurchaseState();
+      }
     }
   }, [isGuide, isTourist, location]);
 
@@ -223,7 +351,125 @@ useEffect(() => {
             <span>Price: {openTour.price}</span>
             <span>By @{openTour.authorUsername}</span>
             <span>Updated: {formatDate(openTour.updatedAt)}</span>
+            {openTour.publishedAt && (
+              <span>Published: {formatDate(openTour.publishedAt)}</span>
+            )}
+            {openTour.archivedAt && (
+              <span>Archived: {formatDate(openTour.archivedAt)}</span>
+            )}
+            {isTourist && purchasedTourIds.has(openTour.id) && (
+              <span className="rounded-full bg-secondary-soft px-2 py-1 font-medium text-secondary">
+                Purchased
+              </span>
+            )}
+            {isTourist && cartTourIds.has(openTour.id) && (
+              <span className="rounded-full bg-primary-soft px-2 py-1 font-medium text-primary">
+                In cart
+              </span>
+            )}
+            {openTour.totalDistanceKm > 0 && (
+              <span>Total distance: {openTour.totalDistanceKm.toFixed(2)} km</span>
+            )}
           </div>
+
+          {isGuide && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {openTour.status === "Draft" && (
+                <button
+                  type="button"
+                  disabled={actionLoading || !canPublishTour}
+                  onClick={publishTour}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-60"
+                >
+                  {actionLoading ? "Publishing..." : "Publish tour"}
+                </button>
+              )}
+              {openTour.status === "Published" && (
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={archiveTour}
+                  className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:bg-error/90 disabled:opacity-60"
+                >
+                  {actionLoading ? "Archiving..." : "Archive tour"}
+                </button>
+              )}
+              {openTour.status === "Archived" && (
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={reactivateTour}
+                  className="rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary-hover disabled:opacity-60"
+                >
+                  {actionLoading ? "Reactivating..." : "Reactivate tour"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {isGuide && openTour.status === "Draft" && !canPublishTour && (
+            <div className="mt-3 rounded-lg bg-muted/50 px-4 py-3 text-sm text-text-secondary">
+              Tour must have at least two key points, one transport time, and tags before it can be published.
+            </div>
+          )}
+
+          {isTourist && openTour.status === "Published" && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {purchasedTourIds.has(openTour.id) ? (
+                <>
+                  <span className="rounded-lg bg-secondary-soft px-4 py-2 text-sm font-medium text-secondary">
+                    You own this tour — all key points unlocked
+                  </span>
+                  <button
+                    type="button"
+                    disabled={executionLoading}
+                    onClick={() => void startTourExecution()}
+                    className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-60"
+                  >
+                    {executionLoading ? "Starting..." : "Start tour"}
+                  </button>
+                </>
+              ) : cartTourIds.has(openTour.id) ? (
+                <Link
+                  to="/cart"
+                  className="rounded-lg border bg-surface px-4 py-2 text-sm font-medium text-text-primary hover:bg-muted"
+                >
+                  View cart
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  disabled={cartActionLoading}
+                  onClick={() => void addToCart(openTour.id)}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-60"
+                >
+                  {cartActionLoading ? "Adding..." : "Add to cart"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {isTourist && openTour.status === "Published" && !purchasedTourIds.has(openTour.id) && openTour.keyPoints.length > 1 && (
+            <div className="mt-3 rounded-lg bg-muted/50 px-4 py-3 text-sm text-text-secondary">
+              Purchase this tour to unlock all {openTour.keyPoints.length} key points.
+            </div>
+          )}
+
+          {isTourist && openTour.status === "Archived" && purchasedTourIds.has(openTour.id) && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="rounded-lg bg-secondary-soft px-4 py-2 text-sm font-medium text-secondary">
+                Archived tour available for execution
+              </span>
+              <button
+                type="button"
+                disabled={executionLoading}
+                onClick={() => void startTourExecution()}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-60"
+              >
+                {executionLoading ? "Starting..." : "Start tour"}
+              </button>
+            </div>
+          )}
 
           <h1 className="mt-3 text-2xl font-semibold leading-snug">
             {openTour.name}
@@ -246,85 +492,169 @@ useEffect(() => {
             ))}
           </div>
 
-          <section className="mt-6">
-           <div className="flex items-center justify-between">
-    <h2 className="text-base font-semibold">Key points</h2>
-    <div className="flex gap-2">
-      {openTour.keyPoints.length > 0 && (
-        <button 
-          onClick={() => setShowMap(!showMap)}
-          className="text-xs font-medium text-primary hover:underline"
-        >
-          {showMap ? "Hide Map" : "Show Route on Map"}
-        </button>
-      )}
-      <div className="text-xs text-text-muted">{openTour.keyPoints.length} total</div>
-    </div>
-  </div>
+          {isGuide && (
+            <section className="mt-6 rounded-xl border p-4">
+              <h2 className="mb-3 text-base font-semibold">
+                Add transport time
+              </h2>
 
-  {/* MAPA SA LINIJAMA (POLYLINE) */}
-  {showMap && openTour.keyPoints.length > 0 && (
-    <div className="mt-4 h-[350px] w-full rounded-xl border overflow-hidden">
-      <MapContainer 
-        center={[openTour.keyPoints[0].latitude, openTour.keyPoints[0].longitude]} 
-        zoom={13} 
-        className="h-full w-full"
-      >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        {openTour.keyPoints.map((kp) => (
-          <Marker key={kp.id} position={[kp.latitude, kp.longitude]}>
-            <Popup>{kp.name}</Popup>
-          </Marker>
-        ))}
-        <Polyline 
-          positions={routeCoords} 
-          color="#3b82f6" 
-          weight={5}
-          opacity={0.7}
-        />
-      </MapContainer>
-    </div>
-  )}
-
-  <div className="mt-3 space-y-2">
-    {openTour.keyPoints.map((point) => (
-      <div key={point.id} className="group relative rounded-lg border bg-surface p-4 transition-colors hover:border-primary">
-        <div className="flex items-start justify-between">
-          <button onClick={() => setSelectedKeyPoint(point)} className="text-left">
-            <h3 className="font-semibold text-text-primary">{point.name}</h3>
-            <p className="mt-1 line-clamp-1 text-sm text-text-secondary">{point.description}</p>
-          </button>
-          
-          <div className="flex gap-2">
-            {isGuide && (
-              <>
-                <button 
-                  onClick={() => navigate(`/tours/${openTour.id}/key-points/${point.id}/edit`)}
-                  className="text-xs text-primary hover:underline"
+              <div className="flex flex-wrap gap-3">
+                <select
+                  value={transportType}
+                  onChange={(e) =>
+                    setTransportType(
+                      e.target.value as "Walking" | "Bicycle" | "Car"
+                    )
+                  }
+                  className="rounded-lg border px-3 py-2"
                 >
-                  Edit
-                </button>
-                <button 
+                  <option value="Walking">Walking</option>
+                  <option value="Bicycle">Bicycle</option>
+                  <option value="Car">Car</option>
+                </select>
+
+                <input
+                  type="number"
+                  min={1}
+                  value={durationMinutes}
+                  onChange={(e) =>
+                    setDurationMinutes(Number(e.target.value))
+                  }
+                  className="rounded-lg border px-3 py-2"
+                  placeholder="Minutes"
+                />
+
+                <button
+                  type="button"
+                  className="rounded-lg bg-primary px-4 py-2 text-white"
                   onClick={async () => {
-                    if (window.confirm("Delete this point?")) {
-                      const updated = await tourService.deleteKeyPoint(openTour.id, point.id);
-                      setTours(tours.map(t => t.id === updated.id ? updated : t));
+                    try {
+                      const updated = await tourService.addTransportTime(
+                        openTour.id,
+                        {
+                          type: transportType,
+                          durationMinutes,
+                        }
+                      );
+
+                      setTours(
+                        tours.map((t) =>
+                          t.id === updated.id ? updated : t
+                        )
+                      );
+                    } catch (err) {
+                      setError(
+                        getTourApiErrorMessage(
+                          err,
+                          "Failed to add transport time"
+                        )
+                      );
                     }
                   }}
-                  className="text-xs text-error hover:underline"
                 >
-                  Delete
+                  Add
                 </button>
-              </>
-            )}
-            <button onClick={() => setSelectedKeyPoint(point)} className="text-xs text-primary font-medium">
-              View
-            </button>
+              </div>
+            </section>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {openTour.transportTimes?.map((t) => (
+              <div
+                key={`${t.type}-${t.durationMinutes}`}
+                className="rounded-full border border-gray-300 bg-gray-50 px-4 py-2 text-sm shadow-sm"
+              >
+                <span className="font-medium">{t.type}</span>
+                <span className="ml-2 text-gray-600">
+                  {t.durationMinutes} min
+                </span>
+              </div>
+            ))}
           </div>
-        </div>
-      </div>
-    ))}
-  </div>
+
+          <section className="mt-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">Key points</h2>
+              <div className="flex gap-2">
+                {visibleKeyPoints.length > 0 && (
+                  <button
+                    onClick={() => setShowMap(!showMap)}
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    {showMap ? "Hide Map" : "Show route"}
+                  </button>
+                )}
+                <div className="text-xs text-text-muted">{visibleKeyPoints.length} visible</div>
+              </div>
+            </div>
+
+            {/* MAPA SA LINIJAMA (POLYLINE) */}
+            {showMap && visibleKeyPoints.length > 0 && (
+              <div className="mt-4 h-[350px] w-full rounded-xl border overflow-hidden">
+                <MapContainer
+                  center={[visibleKeyPoints[0].latitude, visibleKeyPoints[0].longitude]}
+                  zoom={13}
+                  className="h-full w-full"
+                >
+                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  {visibleKeyPoints.map((kp) => (
+                    <Marker key={kp.id} position={[kp.latitude, kp.longitude]}>
+                      <Popup>{kp.name}</Popup>
+                    </Marker>
+                  ))}
+                  <Polyline
+                    positions={routeCoords}
+                    color="#3b82f6"
+                    weight={5}
+                    opacity={0.7}
+                  />
+                </MapContainer>
+              </div>
+            )}
+
+            <div className="mt-3 space-y-2">
+              {visibleKeyPoints.map((point) => (
+                <div key={point.id} className="group relative rounded-lg border bg-surface p-4 transition-colors hover:border-primary">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <button onClick={() => setSelectedKeyPoint(point)} className="text-left">
+                      <h3 className="font-semibold text-text-primary">{point.name}</h3>
+                      <p className="mt-1 line-clamp-1 text-sm text-text-secondary">{point.description}</p>
+                    </button>
+                    <div className="text-xs text-text-muted">
+                      {point.order === 1 ? "Start point" : `${point.distanceFromPreviousKm.toFixed(2)} km from previous`}
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-start justify-between">
+                    <div className="flex gap-2">
+                      {isGuide && (
+                        <>
+                          <button
+                            onClick={() => navigate(`/tours/${openTour.id}/key-points/${point.id}/edit`)}
+                            className="text-xs text-primary hover:underline"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (window.confirm("Delete this point?")) {
+                                const updated = await tourService.deleteKeyPoint(openTour.id, point.id);
+                                setTours(tours.map(t => t.id === updated.id ? updated : t));
+                              }
+                            }}
+                            className="text-xs text-error hover:underline"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                      <button onClick={() => setSelectedKeyPoint(point)} className="text-xs text-primary font-medium">
+                        View
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
 
           <section className="mt-10 border-t pt-8">
@@ -339,7 +669,7 @@ useEffect(() => {
             {isTourist && (
               <div className="mt-6 rounded-xl border bg-muted/30 p-5">
                 <h3 className="font-medium">Leave a review</h3>
-                <form 
+                <form
                   onSubmit={async (e) => {
                     e.preventDefault();
                     const target = e.target as any;
@@ -353,7 +683,7 @@ useEffect(() => {
                         rating: userRating, comment, visitDate, images: files
                       });
                       setTours(tours.map(t => t.id === updated.id ? updated : t));
-                      target.reset(); 
+                      target.reset();
                       setUserRating(5);
                     } catch (err) {
                       setError(getTourApiErrorMessage(err, "Failed to add review"));
@@ -364,23 +694,23 @@ useEffect(() => {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <label className="block text-xs font-medium uppercase text-text-muted">Rating</label>
-                    
-                       <div className="mt-2 flex gap-1">
-            {[1, 2, 3, 4, 5].map((num) => (
-              <button
-                key={num}
-                type="button"
-                onClick={() => setUserRating(num)}
-                className="text-2xl transition-transform hover:scale-110"
-              >
-                <span className={num <= userRating ? "text-yellow-500" : "text-gray-300"}>
-                  ★
-                </span>
-              </button>
-            ))}
-            <span className="ml-2 text-sm text-text-muted self-center">({userRating}/5)</span>
-          </div>
-        </div>
+
+                      <div className="mt-2 flex gap-1">
+                        {[1, 2, 3, 4, 5].map((num) => (
+                          <button
+                            key={num}
+                            type="button"
+                            onClick={() => setUserRating(num)}
+                            className="text-2xl transition-transform hover:scale-110"
+                          >
+                            <span className={num <= userRating ? "text-yellow-500" : "text-gray-300"}>
+                              ★
+                            </span>
+                          </button>
+                        ))}
+                        <span className="ml-2 text-sm text-text-muted self-center">({userRating}/5)</span>
+                      </div>
+                    </div>
                     <div>
                       <label className="block text-xs font-medium uppercase text-text-muted">Visit Date</label>
                       <input type="date" name="visitDate" required className="mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none" />
@@ -419,15 +749,15 @@ useEffect(() => {
                     </div>
                     <p className="mt-2 text-sm text-text-secondary">{rev.comment}</p>
                     <div className="mt-1 text-[11px] text-text-muted">Visited on: {new Date(rev.visitDate).toLocaleDateString()}</div>
-                    
+
                     {rev.images && rev.images.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {rev.images.map((img, idx) => (
                           <a key={idx} href={resolveTourAssetUrl(img)} target="_blank" rel="noreferrer">
-                            <img 
-                              src={resolveTourAssetUrl(img)} 
-                              alt="Review" 
-                              className="h-20 w-20 rounded-md border object-cover hover:opacity-80 transition-opacity" 
+                            <img
+                              src={resolveTourAssetUrl(img)}
+                              alt="Review"
+                              className="h-20 w-20 rounded-md border object-cover hover:opacity-80 transition-opacity"
                             />
                           </a>
                         ))}
@@ -509,18 +839,48 @@ useEffect(() => {
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="text-xs text-text-muted">
-                    {tour.status} · {tour.difficulty} · {tour.keyPoints.length}{" "}
-                    key points
-                    {!isGuide && ` · @${tour.authorUsername}`}
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
+                    <span>
+                      {tour.status} · {tour.difficulty} · {tour.keyPoints.length} key points
+                      {!isGuide && ` · @${tour.authorUsername}`}
+                      {tour.totalDistanceKm > 0 && ` · ${tour.totalDistanceKm.toFixed(1)} km`}
+                    </span>
+                    {isTourist && purchasedTourIds.has(tour.id) && (
+                      <span className="rounded-full bg-secondary-soft px-2 py-0.5 font-medium text-secondary">
+                        Purchased
+                      </span>
+                    )}
+                    {isTourist && cartTourIds.has(tour.id) && (
+                      <span className="rounded-full bg-primary-soft px-2 py-0.5 font-medium text-primary">
+                        In cart
+                      </span>
+                    )}
                   </div>
                   <h2 className="mt-1 text-lg font-semibold leading-snug">
                     {tour.name}
                   </h2>
                 </div>
-                <span className="rounded-full bg-secondary-soft px-3 py-1 text-xs font-medium text-secondary">
-                  Price {tour.price}
-                </span>
+                <div className="flex flex-col items-end gap-2">
+                  <span className="rounded-full bg-secondary-soft px-3 py-1 text-xs font-medium text-secondary">
+                    Price {tour.price}
+                  </span>
+                  {isTourist &&
+                    tour.status === "Published" &&
+                    !purchasedTourIds.has(tour.id) &&
+                    !cartTourIds.has(tour.id) && (
+                      <button
+                        type="button"
+                        disabled={cartActionLoading}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void addToCart(tour.id);
+                        }}
+                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-60"
+                      >
+                        Add to cart
+                      </button>
+                    )}
+                </div>
               </div>
               <p className="mt-3 text-sm text-text-secondary">
                 {tour.description.length > 240

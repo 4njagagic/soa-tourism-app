@@ -1,0 +1,62 @@
+syntax = "proto3";
+option csharp_namespace = "TourService.Grpc";
+option go_package = "soa-tourism-app/api-gateway/gen/tour/v1;tourv1";
+package tour.v1;
+
+message StartRequest {
+  string tour_id = 1;
+  string tourist_username = 2;
+  double latitude = 3;
+  double longitude = 4;
+  string bearer_token = 5;
+}
+
+message TourExecutionKeyPointProgress {
+  string key_point_id = 1;
+  string key_point_name = 2;
+  int32 order = 3;
+  double latitude = 4;
+  double longitude = 5;
+  double distance_km = 6;
+  string completed_at = 7;
+}
+
+message TourExecution {
+  string id = 1;
+  string tour_id = 2;
+  string tour_name = 3;
+  string tourist_username = 4;
+  string status = 5;
+  double started_latitude = 6;
+  double started_longitude = 7;
+  double finished_latitude = 8;
+  double finished_longitude = 9;
+  int32 total_key_points = 10;
+  repeated TourExecutionKeyPointProgress completed_key_points = 11;
+  string started_at = 12;
+  string last_activity_at = 13;
+  string finished_at = 14;
+}
+
+message StartResponse {
+  TourExecution execution = 1;
+}
+
+message CheckRequest {
+  string execution_id = 1;
+  string tourist_username = 2;
+  double latitude = 3;
+  double longitude = 4;
+}
+
+message CheckResponse {
+  TourExecution execution = 1;
+  bool matched_key_point = 2;
+  TourExecutionKeyPointProgress completed_key_point = 3;
+  double distance_km = 4;
+}
+
+service TourExecutionService {
+  rpc StartTourExecution (StartRequest) returns (StartResponse);
+  rpc CheckNearbyKeyPoint (CheckRequest) returns (CheckResponse);
+}

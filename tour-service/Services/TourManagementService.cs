@@ -77,6 +77,12 @@ public class TourManagementService : ITourService
             throw new InvalidOperationException("Image is required.");
         }
 
+        var tour = await _repository.GetByIdAndAuthorAsync(id, authorUsername, cancellationToken);
+        if (tour is null)
+        {
+            return null;
+        }
+
         var imageUrl = await SaveImageAsync(request.Image, cancellationToken);
         var keyPoint = new KeyPoint
         {
@@ -85,11 +91,163 @@ public class TourManagementService : ITourService
             Latitude = request.Latitude,
             Longitude = request.Longitude,
             ImageUrl = imageUrl,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            Order = tour.KeyPoints.Count + 1
         };
 
-        var updated = await _repository.AddKeyPointAsync(id, authorUsername, keyPoint, cancellationToken);
+        tour.KeyPoints.Add(keyPoint);
+        RecalculateDistances(tour);
+        tour.UpdatedAt = DateTime.UtcNow;
+
+        var updated = await _repository.UpdateAsync(tour, cancellationToken);
         return updated is null ? null : TourResponse.FromTour(updated);
+    }
+
+    public async Task<TourResponse?> AddTransportTimeAsync(string id, AddTransportTimeRequest request, string authorUsername, CancellationToken cancellationToken)
+    {
+        var tour = await _repository.GetByIdAndAuthorAsync(id, authorUsername, cancellationToken);
+        if (tour is null)
+        {
+            return null;
+        }
+
+        tour.TransportTimes.Add(new TransportTime
+        {
+            Type = request.Type,
+            DurationMinutes = request.DurationMinutes
+        });
+        tour.UpdatedAt = DateTime.UtcNow;
+
+        var updated = await _repository.UpdateAsync(tour, cancellationToken);
+        return updated is null ? null : TourResponse.FromTour(updated);
+    }
+
+    public async Task<TourResponse?> PublishTourAsync(string id, string authorUsername, CancellationToken cancellationToken)
+    {
+        var tour = await _repository.GetByIdAndAuthorAsync(id, authorUsername, cancellationToken);
+        if (tour is null)
+        {
+            return null;
+        }
+
+        if (tour.Status == TourStatus.Published)
+        {
+            return TourResponse.FromTour(tour);
+        }
+
+        if (string.IsNullOrWhiteSpace(tour.Name) || string.IsNullOrWhiteSpace(tour.Description) || string.IsNullOrWhiteSpace(tour.Difficulty) || !tour.Tags.Any())
+        {
+            throw new InvalidOperationException("Tour must have name, description, difficulty, and tags before publishing.");
+        }
+
+        if (tour.KeyPoints.Count < 2)
+        {
+            throw new InvalidOperationException("Tour must contain at least two key points before publishing.");
+        }
+
+        if (!tour.TransportTimes.Any())
+        {
+            throw new InvalidOperationException("Tour must include at least one transport time before publishing.");
+        }
+
+        tour.Status = TourStatus.Published;
+        tour.PublishedAt = DateTime.UtcNow;
+        tour.ArchivedAt = null;
+        tour.UpdatedAt = DateTime.UtcNow;
+
+        var updated = await _repository.UpdateAsync(tour, cancellationToken);
+        return updated is null ? null : TourResponse.FromTour(updated);
+    }
+
+    public async Task<TourResponse?> ArchiveTourAsync(string id, string authorUsername, CancellationToken cancellationToken)
+    {
+        var tour = await _repository.GetByIdAndAuthorAsync(id, authorUsername, cancellationToken);
+        if (tour is null)
+        {
+            return null;
+        }
+
+        if (tour.Status != TourStatus.Published)
+        {
+            throw new InvalidOperationException("Only published tours can be archived.");
+        }
+
+        tour.Status = TourStatus.Archived;
+        tour.ArchivedAt = DateTime.UtcNow;
+        tour.UpdatedAt = DateTime.UtcNow;
+
+        var updated = await _repository.UpdateAsync(tour, cancellationToken);
+        return updated is null ? null : TourResponse.FromTour(updated);
+    }
+
+    public async Task<TourResponse?> ReactivateTourAsync(string id, string authorUsername, CancellationToken cancellationToken)
+    {
+        var tour = await _repository.GetByIdAndAuthorAsync(id, authorUsername, cancellationToken);
+        if (tour is null)
+        {
+            return null;
+        }
+
+        if (tour.Status != TourStatus.Archived)
+        {
+            throw new InvalidOperationException("Only archived tours can be reactivated.");
+        }
+
+        tour.Status = TourStatus.Published;
+        tour.ArchivedAt = null;
+        tour.UpdatedAt = DateTime.UtcNow;
+
+        var updated = await _repository.UpdateAsync(tour, cancellationToken);
+        return updated is null ? null : TourResponse.FromTour(updated);
+    }
+
+    private static void RecalculateDistances(Tour tour)
+    {
+        var ordered = tour.KeyPoints.OrderBy(kp => kp.Order).ToList();
+        decimal total = 0;
+
+        for (var index = 0; index < ordered.Count; index++)
+        {
+            if (index == 0)
+            {
+                ordered[index].DistanceFromPreviousKm = 0;
+            }
+            else
+            {
+                var previous = ordered[index - 1];
+                ordered[index].DistanceFromPreviousKm = CalculateDistanceKm(
+                    previous.Latitude,
+                    previous.Longitude,
+                    ordered[index].Latitude,
+                    ordered[index].Longitude);
+            }
+
+            ordered[index].Order = index + 1;
+            total += ordered[index].DistanceFromPreviousKm;
+        }
+
+        tour.KeyPoints = ordered;
+        tour.TotalDistanceKm = total;
+    }
+
+    private static decimal CalculateDistanceKm(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double EarthRadiusKm = 6371.0;
+        static double ToRadians(double degrees) => degrees * Math.PI / 180.0;
+
+        var latRad1 = ToRadians(lat1);
+        var lonRad1 = ToRadians(lon1);
+        var latRad2 = ToRadians(lat2);
+        var lonRad2 = ToRadians(lon2);
+        var dLat = latRad2 - latRad1;
+        var dLon = lonRad2 - lonRad1;
+
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2)
+              + Math.Cos(latRad1) * Math.Cos(latRad2)
+              * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+
+        return (decimal)(EarthRadiusKm * c);
     }
 
     private static List<string> NormalizeTags(IEnumerable<string> tags)
@@ -130,63 +288,96 @@ public class TourManagementService : ITourService
     }
 
     public async Task<TourResponse?> AddReviewAsync(string tourId, AddReviewRequest request, string touristUsername, CancellationToken cancellationToken)
-{
-    var imageUrls = new List<string>();
-    
-    if (request.Images != null && request.Images.Any())
     {
-        foreach (var file in request.Images)
+        var imageUrls = new List<string>();
+
+        if (request.Images != null && request.Images.Any())
         {
-            var url = await SaveImageAsync(file, cancellationToken);
-            imageUrls.Add(url);
+            foreach (var file in request.Images)
+            {
+                var url = await SaveImageAsync(file, cancellationToken);
+                imageUrls.Add(url);
+            }
         }
+
+        var review = new Review
+        {
+            Rating = request.Rating,
+            Comment = request.Comment.Trim(),
+            TouristUsername = touristUsername,
+            VisitDate = request.VisitDate,
+            Images = imageUrls
+        };
+
+        var updated = await _repository.AddReviewAsync(tourId, review, cancellationToken);
+        return updated is null ? null : TourResponse.FromTour(updated);
     }
 
-    var review = new Review
+    public async Task<TourResponse?> UpdateKeyPointAsync(string tourId, string pointId, UpdateKeyPointRequest request, string authorUsername, CancellationToken cancellationToken)
     {
-        Rating = request.Rating,
-        Comment = request.Comment.Trim(),
-        TouristUsername = touristUsername,
-        VisitDate = request.VisitDate,
-        Images = imageUrls
-    };
+        var tour = await _repository.GetByIdAndAuthorAsync(tourId, authorUsername, cancellationToken);
+        if (tour == null) return null;
 
-    var updated = await _repository.AddReviewAsync(tourId, review, cancellationToken);
-    return updated is null ? null : TourResponse.FromTour(updated);
-}
+        var existingPoint = tour.KeyPoints.FirstOrDefault(kp => kp.Id == pointId);
+        if (existingPoint == null) throw new InvalidOperationException("Key point not found.");
 
-public async Task<TourResponse?> UpdateKeyPointAsync(string tourId, string pointId, UpdateKeyPointRequest request, string authorUsername, CancellationToken cancellationToken)
-{
-    var tour = await _repository.GetByIdAndAuthorAsync(tourId, authorUsername, cancellationToken);
-    if (tour == null) return null;
+        string imageUrl = existingPoint.ImageUrl;
+        if (request.Image != null && request.Image.Length > 0)
+        {
+            imageUrl = await SaveImageAsync(request.Image, cancellationToken);
+        }
 
-    var existingPoint = tour.KeyPoints.FirstOrDefault(kp => kp.Id == pointId);
-    if (existingPoint == null) throw new InvalidOperationException("Key point not found.");
+        existingPoint.Name = request.Name.Trim();
+        existingPoint.Description = request.Description.Trim();
+        existingPoint.Latitude = request.Latitude;
+        existingPoint.Longitude = request.Longitude;
+        existingPoint.ImageUrl = imageUrl;
 
-    string imageUrl = existingPoint.ImageUrl;
-    if (request.Image != null && request.Image.Length > 0)
-    {
-        imageUrl = await SaveImageAsync(request.Image, cancellationToken);
+        RecalculateDistances(tour);
+        tour.UpdatedAt = DateTime.UtcNow;
+
+        var result = await _repository.UpdateAsync(tour, cancellationToken);
+        return result == null ? null : TourResponse.FromTour(result);
     }
 
-    var updatedPoint = new KeyPoint
+    public async Task<TourResponse?> DeleteKeyPointAsync(string tourId, string pointId, string authorUsername, CancellationToken cancellationToken)
     {
-        Id = pointId,
-        Name = request.Name.Trim(),
-        Description = request.Description.Trim(),
-        Latitude = request.Latitude,
-        Longitude = request.Longitude,
-        ImageUrl = imageUrl,
-        CreatedAt = existingPoint.CreatedAt
-    };
+        var tour = await _repository.GetByIdAndAuthorAsync(tourId, authorUsername, cancellationToken);
+        if (tour is null)
+        {
+            return null;
+        }
 
-    var result = await _repository.UpdateKeyPointAsync(tourId, authorUsername, updatedPoint, cancellationToken);
-    return result == null ? null : TourResponse.FromTour(result);
-}
+        tour.KeyPoints = tour.KeyPoints.Where(kp => kp.Id != pointId).ToList();
+        RecalculateDistances(tour);
+        tour.UpdatedAt = DateTime.UtcNow;
 
-public async Task<TourResponse?> DeleteKeyPointAsync(string tourId, string pointId, string authorUsername, CancellationToken cancellationToken)
-{
-    var result = await _repository.DeleteKeyPointAsync(tourId, authorUsername, pointId, cancellationToken);
-    return result == null ? null : TourResponse.FromTour(result);
-}
+        var result = await _repository.UpdateAsync(tour, cancellationToken);
+        return result == null ? null : TourResponse.FromTour(result);
+    }
+
+    public async Task<TourPurchaseValidationResponse?> ValidateTourForPurchaseAsync(string id, CancellationToken cancellationToken)
+    {
+        var tour = await _repository.GetByIdAsync(id, cancellationToken);
+        if (tour is null)
+        {
+            return null;
+        }
+
+        if (tour.Status == TourStatus.Archived)
+        {
+            throw new InvalidOperationException("Archived tours cannot be purchased.");
+        }
+
+        if (tour.Status != TourStatus.Published)
+        {
+            throw new InvalidOperationException("Only published tours can be purchased.");
+        }
+
+        return new TourPurchaseValidationResponse(
+            tour.Id ?? string.Empty,
+            tour.Name,
+            tour.Price,
+            tour.Status);
+    }
 }
